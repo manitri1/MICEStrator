@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Set-Location \"e:\\\\work\\\\ClaudeCode\\\\MICEstrator\"; $env:DATABASE_URL=\"postgresql://postgres:2fysg2Cipj5ybs3FO68Q@db.dvxmvfjrmhdzroystneq.supabase.co:5432/postgres\"; cmd /c \"node_modules\\\\.bin\\\\drizzle-kit.cmd push --config drizzle.config.ts\" 2>&1 | Select-Object -First 40)"
+    ]
+  }
+}
