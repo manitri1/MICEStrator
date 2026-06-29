@@ -414,7 +414,7 @@ export default function Phase6Page() {
                         </span>
                       </div>
                       <p className="text-sm font-semibold text-gray-800">{item.finding}</p>
-                      <p className="text-xs text-gray-500 mt-1 leading-relaxed italic">"{item.evidence}"</p>
+                      <p className="text-xs text-gray-500 mt-1 leading-relaxed italic">&ldquo;{item.evidence}&rdquo;</p>
                     </div>
                   ))}
                 </div>
@@ -432,7 +432,7 @@ export default function Phase6Page() {
                         </span>
                       </div>
                       <p className="text-sm font-semibold text-gray-800">{item.finding}</p>
-                      <p className="text-xs text-gray-500 mt-1 leading-relaxed italic">"{item.evidence}"</p>
+                      <p className="text-xs text-gray-500 mt-1 leading-relaxed italic">&ldquo;{item.evidence}&rdquo;</p>
                     </div>
                   ))}
                 </div>

@@ -17,7 +17,7 @@ export function Phase1Section({ data }: { data: Phase01Output }) {
         <div className="mt-4 pt-4 border-t border-blue-100 grid grid-cols-2 gap-4">
           <div>
             <p className="text-xs font-medium text-gray-500">슬로건</p>
-            <p className="mt-0.5 text-sm font-semibold text-blue-700">"{data.slogan}"</p>
+            <p className="mt-0.5 text-sm font-semibold text-blue-700">&ldquo;{data.slogan}&rdquo;</p>
           </div>
           <div>
             <p className="text-xs font-medium text-gray-500">부제</p>

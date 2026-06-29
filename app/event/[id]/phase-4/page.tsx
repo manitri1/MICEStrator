@@ -185,7 +185,7 @@ export default function Phase4Page() {
         {sourcingCandidates && (
           <div className="space-y-3">
             <p className="text-xs text-gray-500 font-medium">
-              추천 후보 {sourcingCandidates.candidates.length}명 — "선택"을 누르면 아래 폼에 자동 추가됩니다 (최대 5명)
+              추천 후보 {sourcingCandidates.candidates.length}명 — &ldquo;선택&rdquo;을 누르면 아래 폼에 자동 추가됩니다 (최대 5명)
             </p>
             <div className="space-y-2">
               {sourcingCandidates.candidates.map((c, i) => {

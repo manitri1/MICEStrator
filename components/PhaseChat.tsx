@@ -244,6 +244,7 @@ export function PhaseChat({ phaseNumber, eventId, currentOutput, context, onAppl
 
           {capturedImage && (
             <div className="mx-4 mb-2 flex items-center gap-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={capturedImage} alt="캡처 미리보기" className="w-12 h-8 object-cover rounded border" />
               <span className="text-xs text-blue-600 flex-1">화면 캡처 첨부됨</span>
               <button
