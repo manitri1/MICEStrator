@@ -72,6 +72,18 @@ MICEstrator는 **MICE(Meetings, Incentives, Conventions, Exhibitions) 행사 기
 | **컴포넌트 기반 출력** | 각 Phase 출력이 독립된 컴포넌트로 분리 (재사용 및 다음 Phase 입력 가능) |
 | **데이터 무왜곡 원칙** | Phase 6 분석 시 긍정·부정 피드백 모두 가감 없이 보고 |
 
+## 결과 편집 & 멀티모달 리뷰 (SPEC-CHAT-001)
+
+각 Phase 결과를 AI 채팅으로 부분 수정하고, 화면을 캡처해 멀티모달 피드백을 받을 수 있는 기능.
+
+| 기능 | 설명 |
+|------|------|
+| **PhaseChat 채팅 패널** | 자연어로 결과 수정 요청 → AI가 변경 diff 제안 → 적용/취소 |
+| **ScreenshotCapture** | html2canvas로 현재 화면 캡처 → GPT-4o Vision 멀티모달 리뷰 |
+| **PUT /api/phase-result** | 객체 배열 인덱스 병합 deepMerge — 나머지 필드 보존 |
+| **POST /api/chat/phase-edit** | 스트리밍 편집 API (이미지 첨부 지원) |
+| **useParams 하이드레이션 수정** | Phase 1~6 페이지 `use(params)` → `useParams()` — React 이벤트 버그 수정 |
+
 ## 비범위 (Out of Scope)
 
 - 실제 행사 현장 운영 시스템 (참가자 체크인, 현장 앱)
