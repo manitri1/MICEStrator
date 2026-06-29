@@ -8,6 +8,7 @@ import { Phase03OutputSchema } from '@/lib/schemas/phase-03.schema'
 import { Phase04OutputSchema } from '@/lib/schemas/phase-04.schema'
 import { Phase05OutputSchema } from '@/lib/schemas/phase-05.schema'
 import { Phase06OutputSchema } from '@/lib/schemas/phase-06.schema'
+import { friendlyZodError } from '@/lib/phase-errors'
 import type { ZodTypeAny } from 'zod'
 
 const OUTPUT_SCHEMAS: Record<number, ZodTypeAny> = {
@@ -21,6 +22,16 @@ const OUTPUT_SCHEMAS: Record<number, ZodTypeAny> = {
 
 // @MX:ANCHOR: [AUTO] 모든 Phase 편집 저장의 단일 진입점 — PUT handler.
 // @MX:REASON: PhaseChat의 diff 적용이 이 엔드포인트를 통해서만 저장되므로 fan_in >= 6 예상.
+// P1: 상위 Phase 편집 시 영향받는 하위 Phase 목록
+const PHASE_DOWNSTREAM: Record<number, number[]> = {
+  1: [2, 3, 4, 5, 6],
+  2: [6],
+  3: [4, 5],
+  4: [5, 6],
+  5: [6],
+  6: [],
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const eventId = searchParams.get('eventId')
@@ -90,15 +101,17 @@ export async function PUT(req: NextRequest) {
 
   const existing = rows[0].outputJson as Record<string, unknown>
 
-  // Deep merge: patch가 기존 outputJson에 shallow merge (중첩 객체는 patch 우선)
+  // P2: $append/$remove 연산자를 지원하는 deepMerge 적용
   const merged = deepMerge(existing, patch as Record<string, unknown>)
 
   // OutputSchema 재검증
   const schema = OUTPUT_SCHEMAS[phaseNumber]
   const validated = schema.safeParse(merged)
   if (!validated.success) {
+    // P3: 사용자 친화적 한국어 오류 메시지
+    const message = friendlyZodError(validated.error.issues)
     return NextResponse.json(
-      { error: '편집 내용이 스키마 검증에 실패했습니다.', details: validated.error.flatten() },
+      { error: message, details: validated.error.flatten() },
       { status: 400 }
     )
   }
@@ -144,7 +157,26 @@ export async function PUT(req: NextRequest) {
       })
   }
 
-  return NextResponse.json(updatedJson, { status: 200 })
+  // P1: 영향받는 하위 Phase 목록 응답에 포함
+  const affectedDownstream = PHASE_DOWNSTREAM[phaseNumber] ?? []
+  return NextResponse.json({ updated: updatedJson, affectedDownstream }, { status: 200 })
+}
+
+// P2: $append — 배열 끝에 항목 추가 / $remove — 인덱스 기준 항목 삭제
+function isAppendOp(v: unknown): v is { $append: unknown[] } {
+  return (
+    typeof v === 'object' && v !== null &&
+    '$append' in v &&
+    Array.isArray((v as Record<string, unknown>).$append)
+  )
+}
+
+function isRemoveOp(v: unknown): v is { $remove: number[] } {
+  return (
+    typeof v === 'object' && v !== null &&
+    '$remove' in v &&
+    Array.isArray((v as Record<string, unknown>).$remove)
+  )
 }
 
 function deepMerge(
@@ -155,6 +187,21 @@ function deepMerge(
   for (const key of Object.keys(patch)) {
     const pv = patch[key]
     const bv = base[key]
+
+    // P2: $append 연산자 처리
+    if (isAppendOp(pv)) {
+      result[key] = Array.isArray(bv) ? [...bv, ...pv.$append] : [...pv.$append]
+      continue
+    }
+
+    // P2: $remove 연산자 처리
+    if (isRemoveOp(pv)) {
+      const removeSet = new Set(pv.$remove)
+      result[key] = Array.isArray(bv)
+        ? bv.filter((_, i) => !removeSet.has(i))
+        : bv
+      continue
+    }
 
     if (
       Array.isArray(pv) && Array.isArray(bv) &&

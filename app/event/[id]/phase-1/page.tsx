@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import type { Phase01Output } from '@/lib/schemas/phase-01.schema'
 import { PhaseChat } from '@/components/PhaseChat'
+import { PhaseStaleBanner } from '@/components/PhaseStaleBanner'
 
 type PrepPeriod = '3months' | '6months' | '12months'
 type EventScale = 'small' | 'medium' | 'large'
@@ -28,6 +29,7 @@ export default function Phase1Page() {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<Phase01Output | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [staledPhases, setStaledPhases] = useState<number[]>([])
   const [openPersona, setOpenPersona] = useState<number | null>(null)
   useEffect(() => {
     fetch(`/api/phase-result?eventId=${eventId}&phase=1`)
@@ -276,11 +278,19 @@ export default function Phase1Page() {
         </div>
       )}
 
+      <PhaseStaleBanner
+        editedPhase={1}
+        affectedPhases={staledPhases}
+        onDismiss={() => setStaledPhases([])}
+      />
       <PhaseChat
         phaseNumber={1}
         eventId={eventId}
         currentOutput={result as Record<string, unknown> | null}
-        onApply={updated => setResult(updated as Phase01Output)}
+        onApply={(updated, affected) => {
+          setResult(updated as Phase01Output)
+          setStaledPhases(affected)
+        }}
       />
     </main>
   )

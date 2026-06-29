@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { ScreenshotCapture } from '@/components/ScreenshotCapture'
 
 interface Props {
@@ -8,7 +8,7 @@ interface Props {
   eventId: string
   currentOutput: Record<string, unknown> | null
   context?: string
-  onApply: (updated: Record<string, unknown>) => void
+  onApply: (updated: Record<string, unknown>, affectedDownstream: number[]) => void
 }
 
 type ContentPart = { type: 'text'; text: string } | { type: 'image'; image: string }
@@ -45,10 +45,35 @@ export function PhaseChat({ phaseNumber, eventId, currentOutput, context, onAppl
   const [capturedImage, setCapturedImage] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const targetRef = useRef<HTMLElement | null>(null)
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  // P4: 컴포넌트 마운트 시 히스토리 로드
+  useEffect(() => {
+    fetch(`/api/chat-logs?eventId=${eventId}&phase=${phaseNumber}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data?.messages?.length > 0) {
+          setMessages(data.messages as ChatMessage[])
+        }
+      })
+      .catch(() => {})
+  }, [eventId, phaseNumber])
+
+  // P4: 메시지 변경 시 debounce(1s) 저장
+  const saveMessages = useCallback((msgs: ChatMessage[]) => {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    saveTimerRef.current = setTimeout(() => {
+      fetch('/api/chat-logs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eventId, phaseNumber, messages: msgs }),
+      }).catch(() => {})
+    }, 1000)
+  }, [eventId, phaseNumber])
 
   async function sendMessage(userContent: ChatContent) {
     const userMsg: ChatMessage = {
@@ -96,6 +121,12 @@ export function PhaseChat({ phaseNumber, eventId, currentOutput, context, onAppl
         )
       }
 
+      const finalMessages: ChatMessage[] = [
+        ...nextMessages,
+        { id: assistantId, role: 'assistant' as const, content: accumulated },
+      ]
+      saveMessages(finalMessages)
+
       const patch = extractPatch(accumulated)
       if (patch) setPendingPatch(patch)
     } catch {
@@ -142,8 +173,12 @@ export function PhaseChat({ phaseNumber, eventId, currentOutput, context, onAppl
         throw new Error(data.error ?? '저장에 실패했습니다.')
       }
 
-      const updated = await res.json()
-      onApply(updated)
+      // P1: { updated, affectedDownstream } 구조
+      const { updated, affectedDownstream } = await res.json() as {
+        updated: Record<string, unknown>
+        affectedDownstream: number[]
+      }
+      onApply(updated, affectedDownstream)
       setPendingPatch(null)
     } catch (err) {
       setApplyError(err instanceof Error ? err.message : '저장 오류가 발생했습니다.')
@@ -162,6 +197,11 @@ export function PhaseChat({ phaseNumber, eventId, currentOutput, context, onAppl
         >
           <span>{open ? '▲' : '▼'}</span>
           💬 결과 수정하기
+          {messages.length > 0 && (
+            <span className="ml-1 rounded-full bg-blue-100 px-1.5 py-0.5 text-xs text-blue-600">
+              {messages.length}
+            </span>
+          )}
         </button>
 
         {currentOutput && (

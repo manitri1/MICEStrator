@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import type { Phase06Output, SurveyResponse } from '@/lib/schemas/phase-06.schema'
 import { PhaseChat } from '@/components/PhaseChat'
+import { PhaseStaleBanner } from '@/components/PhaseStaleBanner'
 
 type TabKey = 'kpi' | 'sentiment' | 'persona' | 'recommendations'
 
@@ -81,6 +82,7 @@ export default function Phase6Page() {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<Phase06Output | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [staledPhases, setStaledPhases] = useState<number[]>([])
   const [activeTab, setActiveTab] = useState<TabKey>('kpi')
 
   useEffect(() => {
@@ -492,11 +494,19 @@ export default function Phase6Page() {
         </div>
       )}
 
+      <PhaseStaleBanner
+        editedPhase={6}
+        affectedPhases={staledPhases}
+        onDismiss={() => setStaledPhases([])}
+      />
       <PhaseChat
         phaseNumber={6}
         eventId={eventId}
         currentOutput={result as Record<string, unknown> | null}
-        onApply={updated => setResult(updated as Phase06Output)}
+        onApply={(updated, affected) => {
+          setResult(updated as Phase06Output)
+          setStaledPhases(affected)
+        }}
       />
     </main>
   )

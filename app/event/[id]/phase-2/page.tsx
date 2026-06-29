@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import type { Phase02Output } from '@/lib/schemas/phase-02.schema'
 import { PhaseChat } from '@/components/PhaseChat'
+import { PhaseStaleBanner } from '@/components/PhaseStaleBanner'
 
 const PRIORITY_COLOR: Record<string, string> = {
   high: 'bg-red-100 text-red-700',
@@ -23,6 +24,7 @@ export default function Phase2Page() {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<Phase02Output | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [staledPhases, setStaledPhases] = useState<number[]>([])
   const [activeTab, setActiveTab] = useState<'wbs' | 'milestones' | 'departments'>('departments')
 
   useEffect(() => {
@@ -280,11 +282,19 @@ export default function Phase2Page() {
         </div>
       )}
 
+      <PhaseStaleBanner
+        editedPhase={2}
+        affectedPhases={staledPhases}
+        onDismiss={() => setStaledPhases([])}
+      />
       <PhaseChat
         phaseNumber={2}
         eventId={eventId}
         currentOutput={result as Record<string, unknown> | null}
-        onApply={updated => setResult(updated as Phase02Output)}
+        onApply={(updated, affected) => {
+          setResult(updated as Phase02Output)
+          setStaledPhases(affected)
+        }}
       />
     </main>
   )

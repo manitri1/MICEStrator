@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import type { Phase04Output, SpeakerInput } from '@/lib/schemas/phase-04.schema'
 import { PhaseChat } from '@/components/PhaseChat'
+import { PhaseStaleBanner } from '@/components/PhaseStaleBanner'
 import type { Phase04SourcingOutput, SpeakerCandidate } from '@/lib/schemas/phase-04-sourcing.schema'
 
 type BudgetTier = 'premium' | 'standard' | 'economy'
@@ -47,6 +48,7 @@ export default function Phase4Page() {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<Phase04Output | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [staledPhases, setStaledPhases] = useState<number[]>([])
   const [openIndex, setOpenIndex] = useState<number>(0)
   const [activeTab, setActiveTab] = useState<Record<number, 'email' | 'slides'>>({})
   const [sourcingLoading, setSourcingLoading] = useState(false)
@@ -505,12 +507,20 @@ export default function Phase4Page() {
         </div>
       )}
 
+      <PhaseStaleBanner
+        editedPhase={4}
+        affectedPhases={staledPhases}
+        onDismiss={() => setStaledPhases([])}
+      />
       <PhaseChat
         phaseNumber={4}
         eventId={eventId}
         currentOutput={result as Record<string, unknown> | null}
         context={`현재 열린 연사: ${openIndex}번째, 활성 탭: ${activeTab[openIndex] ?? 'email'}`}
-        onApply={updated => setResult(updated as Phase04Output)}
+        onApply={(updated, affected) => {
+          setResult(updated as Phase04Output)
+          setStaledPhases(affected)
+        }}
       />
     </main>
   )
