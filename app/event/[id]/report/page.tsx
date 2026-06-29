@@ -73,7 +73,7 @@ export default async function ReportPage({
         </div>
 
         {/* Cover */}
-        <div className="bg-white border rounded-2xl p-8 mb-2">
+        <div id="report-body" className="bg-white border rounded-2xl p-8 mb-2">
           <p className="text-xs font-semibold text-blue-500 uppercase tracking-widest mb-3">
             MICE Planning Report
           </p>

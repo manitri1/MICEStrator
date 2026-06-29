@@ -63,6 +63,7 @@ export default function Phase5Page() {
   const [error, setError] = useState<string | null>(null)
   const [staledPhases, setStaledPhases] = useState<number[]>([])
   const [activeTab, setActiveTab] = useState<TabKey>('instagram')
+  const [phase4Loaded, setPhase4Loaded] = useState(false)
 
   useEffect(() => {
     fetch(`/api/phase-result?eventId=${eventId}&phase=5`)
@@ -70,6 +71,21 @@ export default function Phase5Page() {
       .then(data => { if (data) setResult(data) })
       .catch(() => {})
   }, [eventId])
+
+  function loadFromPhase4() {
+    try {
+      const saved = localStorage.getItem(`confirmed-speakers-${eventId}`)
+      if (!saved) return
+      const parsed = JSON.parse(saved) as { name: string; affiliation: string }[]
+      if (!Array.isArray(parsed) || parsed.length === 0) return
+      const lines = parsed
+        .filter(s => s.name?.trim())
+        .map(s => s.affiliation?.trim() ? `${s.name} / ${s.affiliation}` : s.name)
+        .join('\n')
+      setSpeakerInput(lines)
+      setPhase4Loaded(true)
+    } catch { /* 손상된 데이터 무시 */ }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -117,14 +133,27 @@ export default function Phase5Page() {
       {/* 입력 폼 */}
       <form onSubmit={handleSubmit} className="bg-white border rounded-xl p-6 shadow-sm space-y-5">
         <div>
-          <label className="block text-sm font-medium mb-1">
-            확정 연사 목록 <span className="text-gray-400 font-normal text-xs">(선택 — 한 줄에 한 명)</span>
-          </label>
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-sm font-medium">
+              확정 연사 목록 <span className="text-gray-400 font-normal text-xs">(선택 — 한 줄에 한 명)</span>
+            </label>
+            <button
+              type="button"
+              onClick={loadFromPhase4}
+              className={`text-xs px-2.5 py-1 rounded-lg border transition-colors flex-shrink-0 ${
+                phase4Loaded
+                  ? 'border-green-300 text-green-600 bg-green-50'
+                  : 'border-gray-300 text-gray-600 hover:bg-blue-50 hover:border-blue-400 hover:text-blue-700'
+              }`}
+            >
+              {phase4Loaded ? 'Phase 4 불러옴 ✓' : 'Phase 4에서 가져오기'}
+            </button>
+          </div>
           <textarea
             rows={3}
             disabled={loading}
             value={speakerInput}
-            onChange={e => setSpeakerInput(e.target.value)}
+            onChange={e => { setSpeakerInput(e.target.value); setPhase4Loaded(false) }}
             placeholder={'홍길동 / ABC Corp CEO\n Jane Smith / XYZ AI CSO'}
             className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 resize-none"
           />

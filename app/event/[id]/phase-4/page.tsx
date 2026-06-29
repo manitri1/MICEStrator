@@ -97,6 +97,8 @@ export default function Phase4Page() {
       setResult(data)
       setOpenIndex(0)
       setActiveTab({ 0: 'email' })
+      // 확정 연사 목록 저장 (재방문 시 복원용)
+      localStorage.setItem(`confirmed-speakers-${eventId}`, JSON.stringify(speakers))
     } catch (err) {
       setError(err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.')
     } finally {
@@ -204,10 +206,27 @@ export default function Phase4Page() {
                         </span>
                         <p className="text-sm font-semibold text-gray-900">{c.name}</p>
                         {c.isOverseas && <span className="text-xs text-orange-500 font-medium">해외</span>}
+                        {c.isRealPerson && <span className="text-xs text-green-600 font-medium bg-green-50 px-1.5 py-0.5 rounded">실존 확인</span>}
                       </div>
                       <p className="text-xs text-gray-500">{c.affiliation}</p>
                       <p className="text-xs text-blue-600 font-medium">{c.proposedSession}</p>
                       <p className="text-xs text-gray-600 leading-relaxed">{c.rationale}</p>
+                      {c.lectureLinks && c.lectureLinks.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 pt-1">
+                          {c.lectureLinks.map((link, j) => (
+                            <a key={j} href={link.url} target="_blank" rel="noopener noreferrer"
+                               className="text-xs px-2 py-0.5 bg-blue-50 text-blue-700 rounded border border-blue-200 hover:bg-blue-100">
+                              ▶ {link.platform}
+                            </a>
+                          ))}
+                        </div>
+                      )}
+                      {c.profileUrl && (
+                        <a href={c.profileUrl} target="_blank" rel="noopener noreferrer"
+                           className="text-xs text-gray-400 hover:text-gray-600 block">
+                          프로필 →
+                        </a>
+                      )}
                     </div>
                     <button
                       type="button"
