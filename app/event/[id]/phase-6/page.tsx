@@ -1,11 +1,10 @@
 'use client'
 
-import { useState, use, useEffect } from 'react'
+import { useState, useEffect } from 'react'
+import { useParams } from 'next/navigation'
 import type { Phase06Output, SurveyResponse } from '@/lib/schemas/phase-06.schema'
-
-interface Props {
-  params: Promise<{ id: string }>
-}
+import { PhaseChat } from '@/components/PhaseChat'
+import { PhaseStaleBanner } from '@/components/PhaseStaleBanner'
 
 type TabKey = 'kpi' | 'sentiment' | 'persona' | 'recommendations'
 
@@ -65,8 +64,8 @@ function KpiCard({ label, value, sub }: { label: string; value: string | number;
   )
 }
 
-export default function Phase6Page({ params }: Props) {
-  const { id: eventId } = use(params)
+export default function Phase6Page() {
+  const { id: eventId } = useParams<{ id: string }>()
   const [targetAttendees, setTargetAttendees] = useState('')
   const [totalRegistered, setTotalRegistered] = useState('')
   const [actualAttended, setActualAttended] = useState('')
@@ -83,6 +82,7 @@ export default function Phase6Page({ params }: Props) {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<Phase06Output | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [staledPhases, setStaledPhases] = useState<number[]>([])
   const [activeTab, setActiveTab] = useState<TabKey>('kpi')
 
   useEffect(() => {
@@ -416,7 +416,7 @@ export default function Phase6Page({ params }: Props) {
                         </span>
                       </div>
                       <p className="text-sm font-semibold text-gray-800">{item.finding}</p>
-                      <p className="text-xs text-gray-500 mt-1 leading-relaxed italic">"{item.evidence}"</p>
+                      <p className="text-xs text-gray-500 mt-1 leading-relaxed italic">&ldquo;{item.evidence}&rdquo;</p>
                     </div>
                   ))}
                 </div>
@@ -434,7 +434,7 @@ export default function Phase6Page({ params }: Props) {
                         </span>
                       </div>
                       <p className="text-sm font-semibold text-gray-800">{item.finding}</p>
-                      <p className="text-xs text-gray-500 mt-1 leading-relaxed italic">"{item.evidence}"</p>
+                      <p className="text-xs text-gray-500 mt-1 leading-relaxed italic">&ldquo;{item.evidence}&rdquo;</p>
                     </div>
                   ))}
                 </div>
@@ -493,6 +493,21 @@ export default function Phase6Page({ params }: Props) {
           )}
         </div>
       )}
+
+      <PhaseStaleBanner
+        editedPhase={6}
+        affectedPhases={staledPhases}
+        onDismiss={() => setStaledPhases([])}
+      />
+      <PhaseChat
+        phaseNumber={6}
+        eventId={eventId}
+        currentOutput={result as Record<string, unknown> | null}
+        onApply={(updated, affected) => {
+          setResult(updated as Phase06Output)
+          setStaledPhases(affected)
+        }}
+      />
     </main>
   )
 }

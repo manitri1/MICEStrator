@@ -9,7 +9,11 @@ const CreateEventSchema = z.object({
 })
 
 export async function GET() {
-  const rows = await db.select().from(events).orderBy(desc(events.createdAt))
+  const rows = await db
+    .select({ id: events.id, name: events.name, status: events.status, createdAt: events.createdAt })
+    .from(events)
+    .orderBy(desc(events.createdAt))
+    .limit(100)
   return NextResponse.json(rows)
 }
 

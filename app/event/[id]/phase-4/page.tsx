@@ -1,12 +1,11 @@
 'use client'
 
-import { useState, use, useEffect } from 'react'
+import { useState, useEffect } from 'react'
+import { useParams } from 'next/navigation'
 import type { Phase04Output, SpeakerInput } from '@/lib/schemas/phase-04.schema'
+import { PhaseChat } from '@/components/PhaseChat'
+import { PhaseStaleBanner } from '@/components/PhaseStaleBanner'
 import type { Phase04SourcingOutput, SpeakerCandidate } from '@/lib/schemas/phase-04-sourcing.schema'
-
-interface Props {
-  params: Promise<{ id: string }>
-}
 
 type BudgetTier = 'premium' | 'standard' | 'economy'
 
@@ -42,13 +41,14 @@ function CopyBtn({ text }: { text: string }) {
   )
 }
 
-export default function Phase4Page({ params }: Props) {
-  const { id: eventId } = use(params)
+export default function Phase4Page() {
+  const { id: eventId } = useParams<{ id: string }>()
   const [speakers, setSpeakers] = useState<SpeakerInput[]>([{ ...EMPTY_SPEAKER }])
   const [budget, setBudget] = useState<BudgetTier | ''>('')
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<Phase04Output | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [staledPhases, setStaledPhases] = useState<number[]>([])
   const [openIndex, setOpenIndex] = useState<number>(0)
   const [activeTab, setActiveTab] = useState<Record<number, 'email' | 'slides'>>({})
   const [sourcingLoading, setSourcingLoading] = useState(false)
@@ -187,7 +187,7 @@ export default function Phase4Page({ params }: Props) {
         {sourcingCandidates && (
           <div className="space-y-3">
             <p className="text-xs text-gray-500 font-medium">
-              추천 후보 {sourcingCandidates.candidates.length}명 — "선택"을 누르면 아래 폼에 자동 추가됩니다 (최대 5명)
+              추천 후보 {sourcingCandidates.candidates.length}명 — &ldquo;선택&rdquo;을 누르면 아래 폼에 자동 추가됩니다 (최대 5명)
             </p>
             <div className="space-y-2">
               {sourcingCandidates.candidates.map((c, i) => {
@@ -506,6 +506,22 @@ export default function Phase4Page({ params }: Props) {
           ))}
         </div>
       )}
+
+      <PhaseStaleBanner
+        editedPhase={4}
+        affectedPhases={staledPhases}
+        onDismiss={() => setStaledPhases([])}
+      />
+      <PhaseChat
+        phaseNumber={4}
+        eventId={eventId}
+        currentOutput={result as Record<string, unknown> | null}
+        context={`현재 열린 연사: ${openIndex}번째, 활성 탭: ${activeTab[openIndex] ?? 'email'}`}
+        onApply={(updated, affected) => {
+          setResult(updated as Phase04Output)
+          setStaledPhases(affected)
+        }}
+      />
     </main>
   )
 }

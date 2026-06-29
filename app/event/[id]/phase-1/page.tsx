@@ -1,11 +1,10 @@
 'use client'
 
-import { useState, use, useEffect } from 'react'
+import { useState, useEffect } from 'react'
+import { useParams } from 'next/navigation'
 import type { Phase01Output } from '@/lib/schemas/phase-01.schema'
-
-interface Props {
-  params: Promise<{ id: string }>
-}
+import { PhaseChat } from '@/components/PhaseChat'
+import { PhaseStaleBanner } from '@/components/PhaseStaleBanner'
 
 type PrepPeriod = '3months' | '6months' | '12months'
 type EventScale = 'small' | 'medium' | 'large'
@@ -22,16 +21,16 @@ const EVENT_SCALE_OPTIONS: { value: EventScale; label: string; desc: string }[] 
   { value: 'large', label: '대규모', desc: '500명 이상' },
 ]
 
-export default function Phase1Page({ params }: Props) {
-  const { id: eventId } = use(params)
+export default function Phase1Page() {
+  const { id: eventId } = useParams<{ id: string }>()
   const [industry, setIndustry] = useState('')
   const [prepPeriod, setPrepPeriod] = useState<PrepPeriod>('6months')
   const [eventScale, setEventScale] = useState<EventScale>('medium')
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<Phase01Output | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [staledPhases, setStaledPhases] = useState<number[]>([])
   const [openPersona, setOpenPersona] = useState<number | null>(null)
-
   useEffect(() => {
     fetch(`/api/phase-result?eventId=${eventId}&phase=1`)
       .then(r => r.json())
@@ -278,6 +277,21 @@ export default function Phase1Page({ params }: Props) {
           </div>
         </div>
       )}
+
+      <PhaseStaleBanner
+        editedPhase={1}
+        affectedPhases={staledPhases}
+        onDismiss={() => setStaledPhases([])}
+      />
+      <PhaseChat
+        phaseNumber={1}
+        eventId={eventId}
+        currentOutput={result as Record<string, unknown> | null}
+        onApply={(updated, affected) => {
+          setResult(updated as Phase01Output)
+          setStaledPhases(affected)
+        }}
+      />
     </main>
   )
 }

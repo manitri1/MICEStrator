@@ -1,11 +1,10 @@
 'use client'
 
-import { useState, use, useEffect } from 'react'
+import { useState, useEffect } from 'react'
+import { useParams } from 'next/navigation'
 import type { Phase05Output } from '@/lib/schemas/phase-05.schema'
-
-interface Props {
-  params: Promise<{ id: string }>
-}
+import { PhaseChat } from '@/components/PhaseChat'
+import { PhaseStaleBanner } from '@/components/PhaseStaleBanner'
 
 type TabKey = 'instagram' | 'linkedin' | 'email' | 'landing' | 'music' | 'schedule'
 
@@ -54,14 +53,15 @@ function ContentBlock({ label, content }: { label?: string; content: string }) {
   )
 }
 
-export default function Phase5Page({ params }: Props) {
-  const { id: eventId } = use(params)
+export default function Phase5Page() {
+  const { id: eventId } = useParams<{ id: string }>()
   const [speakerInput, setSpeakerInput] = useState('')
   const [eventDate, setEventDate] = useState('')
   const [registrationUrl, setRegistrationUrl] = useState('')
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<Phase05Output | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [staledPhases, setStaledPhases] = useState<number[]>([])
   const [activeTab, setActiveTab] = useState<TabKey>('instagram')
 
   useEffect(() => {
@@ -336,6 +336,22 @@ export default function Phase5Page({ params }: Props) {
           )}
         </div>
       )}
+
+      <PhaseStaleBanner
+        editedPhase={5}
+        affectedPhases={staledPhases}
+        onDismiss={() => setStaledPhases([])}
+      />
+      <PhaseChat
+        phaseNumber={5}
+        eventId={eventId}
+        currentOutput={result as Record<string, unknown> | null}
+        context={`현재 활성 탭: ${activeTab}`}
+        onApply={(updated, affected) => {
+          setResult(updated as Phase05Output)
+          setStaledPhases(affected)
+        }}
+      />
     </main>
   )
 }

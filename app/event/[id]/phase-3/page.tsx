@@ -1,11 +1,10 @@
 'use client'
 
-import { useState, use, useEffect } from 'react'
+import { useState, useEffect } from 'react'
+import { useParams } from 'next/navigation'
 import type { Phase03Output } from '@/lib/schemas/phase-03.schema'
-
-interface Props {
-  params: Promise<{ id: string }>
-}
+import { PhaseChat } from '@/components/PhaseChat'
+import { PhaseStaleBanner } from '@/components/PhaseStaleBanner'
 
 type TonePref = 'modern' | 'classic' | 'bold' | 'elegant' | 'playful'
 
@@ -71,12 +70,13 @@ function CopyBlock({ label, content }: { label: string; content: string }) {
   )
 }
 
-export default function Phase3Page({ params }: Props) {
-  const { id: eventId } = use(params)
+export default function Phase3Page() {
+  const { id: eventId } = useParams<{ id: string }>()
   const [tone, setTone] = useState<TonePref | ''>('')
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<Phase03Output | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [staledPhases, setStaledPhases] = useState<number[]>([])
 
   useEffect(() => {
     fetch(`/api/phase-result?eventId=${eventId}&phase=3`)
@@ -273,6 +273,22 @@ export default function Phase3Page({ params }: Props) {
           </div>
         </div>
       )}
+
+      <PhaseStaleBanner
+        editedPhase={3}
+        affectedPhases={staledPhases}
+        onDismiss={() => setStaledPhases([])}
+      />
+      <PhaseChat
+        phaseNumber={3}
+        eventId={eventId}
+        currentOutput={result as Record<string, unknown> | null}
+        context="Phase 3 편집 시 primaryColor, secondaryColors, accentColor 변경은 brandMemory에 자동 동기화됩니다."
+        onApply={(updated, affected) => {
+          setResult(updated as Phase03Output)
+          setStaledPhases(affected)
+        }}
+      />
     </main>
   )
 }

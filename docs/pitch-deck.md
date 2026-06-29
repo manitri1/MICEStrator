@@ -395,6 +395,8 @@ Phase 5 1회 실행 → 인스타·링크드인·이메일·랜딩페이지·음
 | 통합 보고서 발행 | ✅ 웹 뷰 + PDF + Markdown |
 | 연사 AI 추천 기능 | ✅ Phase 4 sourcing agent |
 | brandMemory 파이프라인 | ✅ Phase 3→4·5 자동 주입 |
+| AI 채팅 결과 편집 (PhaseChat) | ✅ 자연어 수정 → diff 제안 → 적용/취소 |
+| 멀티모달 스크린샷 리뷰 | ✅ html2canvas + GPT-4o Vision |
 | 라이브 데모 | ✅ 즉시 가능 |
 
 ### 기술 검증 지표
@@ -403,6 +405,7 @@ Phase 5 1회 실행 → 인스타·링크드인·이메일·랜딩페이지·음
 - Phase 1→6 완주: GPT-4o API 호출 6회
 - 통합 보고서: 6개 Phase 결과 단일 문서로 발행
 - Zod 스키마 검증: AI 출력 구조 오류 0건 (Structured Output 활용)
+- PhaseChat: 스트리밍 편집 API + deepMerge 인덱스 병합 — 나머지 필드 보존
 
 ### 다음 마일스톤
 

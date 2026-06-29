@@ -1,4 +1,4 @@
-import { pgTable, uuid, integer, jsonb, timestamp, text } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, integer, jsonb, timestamp, text, index, uniqueIndex } from 'drizzle-orm/pg-core'
 
 export const events = pgTable('events', {
   id:        uuid('id').primaryKey().defaultRandom(),
@@ -6,7 +6,7 @@ export const events = pgTable('events', {
   status:    text('status').default('draft'),   // draft | in_progress | completed
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
-})
+}, t => [index('events_created_at_idx').on(t.createdAt)])
 
 // Phase 1~6 에이전트 실행 결과 저장
 export const phaseResults = pgTable('phase_results', {
@@ -28,6 +28,16 @@ export const brandMemory = pgTable('brand_memory', {
   updatedAt:       timestamp('updated_at').defaultNow(),
 })
 
+// PhaseChat 대화 히스토리 — Phase별로 1개 행 유지 (upsert)
+export const phaseChatLogs = pgTable('phase_chat_logs', {
+  id:          uuid('id').defaultRandom().primaryKey(),
+  eventId:     uuid('event_id').notNull().references(() => events.id, { onDelete: 'cascade' }),
+  phaseNumber: integer('phase_number').notNull(),
+  messages:    jsonb('messages').notNull().$type<unknown[]>(),
+  updatedAt:   timestamp('updated_at').defaultNow(),
+}, t => [uniqueIndex('phase_chat_logs_event_phase_uidx').on(t.eventId, t.phaseNumber)])
+
 export type Event = typeof events.$inferSelect
 export type PhaseResult = typeof phaseResults.$inferSelect
 export type BrandMemory = typeof brandMemory.$inferSelect
+export type PhaseChatLog = typeof phaseChatLogs.$inferSelect
