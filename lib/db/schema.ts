@@ -1,4 +1,4 @@
-import { pgTable, uuid, integer, jsonb, timestamp, text } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, integer, jsonb, timestamp, text, index } from 'drizzle-orm/pg-core'
 
 export const events = pgTable('events', {
   id:        uuid('id').primaryKey().defaultRandom(),
@@ -6,7 +6,7 @@ export const events = pgTable('events', {
   status:    text('status').default('draft'),   // draft | in_progress | completed
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
-})
+}, t => [index('events_created_at_idx').on(t.createdAt)])
 
 // Phase 1~6 에이전트 실행 결과 저장
 export const phaseResults = pgTable('phase_results', {

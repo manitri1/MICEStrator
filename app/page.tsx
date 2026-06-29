@@ -1,14 +1,7 @@
-'use client'
-
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-
-interface Event {
-  id: string
-  name: string
-  status: string | null
-  createdAt: string | null
-}
+import { db } from '@/lib/db'
+import { events } from '@/lib/db/schema'
+import { desc } from 'drizzle-orm'
+import { NewEventForm } from '@/components/NewEventForm'
 
 const PHASES = [
   { num: 1, label: '행사 기획', short: 'P1' },
@@ -19,106 +12,35 @@ const PHASES = [
   { num: 6, label: 'ROI 분석', short: 'P6' },
 ]
 
-function formatDate(iso: string | null) {
-  if (!iso) return ''
-  return new Date(iso).toLocaleDateString('ko-KR', {
+function formatDate(date: Date | null) {
+  if (!date) return ''
+  return date.toLocaleDateString('ko-KR', {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
   })
 }
 
-export default function HomePage() {
-  const router = useRouter()
-  const [events, setEvents] = useState<Event[]>([])
-  const [loading, setLoading] = useState(true)
-  const [creating, setCreating] = useState(false)
-  const [newName, setNewName] = useState('')
-  const [showForm, setShowForm] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    fetch('/api/events')
-      .then(r => r.json())
-      .then(data => setEvents(Array.isArray(data) ? data : []))
-      .catch(() => setEvents([]))
-      .finally(() => setLoading(false))
-  }, [])
-
-  async function handleCreate(e: React.FormEvent) {
-    e.preventDefault()
-    if (!newName.trim()) return
-    setCreating(true)
-    setError(null)
-    try {
-      const res = await fetch('/api/events', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newName.trim() }),
-      })
-      if (!res.ok) throw new Error('생성 실패')
-      const event: Event = await res.json()
-      router.push(`/event/${event.id}/phase-1`)
-    } catch {
-      setError('행사 생성에 실패했습니다. 다시 시도해주세요.')
-      setCreating(false)
-    }
-  }
+export default async function HomePage() {
+  const eventList = await db
+    .select({ id: events.id, name: events.name, status: events.status, createdAt: events.createdAt })
+    .from(events)
+    .orderBy(desc(events.createdAt))
+    .limit(100)
 
   return (
     <main className="min-h-screen bg-gray-50">
-      {/* 헤더 */}
       <header className="bg-white border-b">
         <div className="max-w-4xl mx-auto px-6 py-5 flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold text-gray-900">MICEstrator</h1>
             <p className="text-xs text-gray-400 mt-0.5">MICE 행사 기획 자동화 에이전트</p>
           </div>
-          <button
-            type="button"
-            onClick={() => { setShowForm(true); setNewName('') }}
-            className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700"
-          >
-            + 새 행사 만들기
-          </button>
+          <NewEventForm />
         </div>
       </header>
 
       <div className="max-w-4xl mx-auto px-6 py-10 space-y-8">
-        {/* 새 행사 생성 폼 */}
-        {showForm && (
-          <div className="bg-white border rounded-xl p-6 shadow-sm">
-            <h2 className="text-base font-semibold mb-4">새 행사 만들기</h2>
-            <form onSubmit={handleCreate} className="flex gap-3">
-              <input
-                autoFocus
-                type="text"
-                value={newName}
-                onChange={e => setNewName(e.target.value)}
-                placeholder="행사명을 입력하세요 (예: 2026 AI 리더십 서밋)"
-                disabled={creating}
-                className="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-              />
-              <button
-                type="submit"
-                disabled={creating || !newName.trim()}
-                className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-              >
-                {creating ? '생성 중...' : '시작하기'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowForm(false)}
-                disabled={creating}
-                className="px-4 py-2 border text-sm text-gray-600 rounded-lg hover:bg-gray-50 disabled:opacity-50"
-              >
-                취소
-              </button>
-            </form>
-            {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
-          </div>
-        )}
-
         {/* 6-Phase 소개 */}
         <div className="bg-white border rounded-xl p-6">
           <h2 className="text-sm font-semibold text-gray-700 mb-4">6단계 AI 기획 파이프라인</h2>
@@ -141,23 +63,16 @@ export default function HomePage() {
         <div>
           <h2 className="text-sm font-semibold text-gray-700 mb-3">행사 목록</h2>
 
-          {loading && (
-            <div className="flex items-center gap-2 text-sm text-gray-400 py-8 justify-center">
-              <span className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
-              불러오는 중...
-            </div>
-          )}
-
-          {!loading && events.length === 0 && (
+          {eventList.length === 0 && (
             <div className="text-center py-16 text-gray-400">
               <p className="text-4xl mb-3">📋</p>
               <p className="text-sm font-medium">아직 기획된 행사가 없습니다.</p>
-              <p className="text-xs mt-1">"새 행사 만들기"를 눌러 시작하세요.</p>
+              <p className="text-xs mt-1">&quot;새 행사 만들기&quot;를 눌러 시작하세요.</p>
             </div>
           )}
 
           <div className="space-y-3">
-            {events.map(event => (
+            {eventList.map(event => (
               <div
                 key={event.id}
                 className="bg-white border rounded-xl p-5 hover:shadow-sm transition-shadow"
@@ -172,7 +87,6 @@ export default function HomePage() {
                   </span>
                 </div>
 
-                {/* Phase 진입 버튼 */}
                 <div className="mt-4 flex flex-wrap gap-2">
                   {PHASES.map(p => (
                     <a

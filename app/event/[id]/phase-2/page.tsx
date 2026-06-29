@@ -1,11 +1,9 @@
 'use client'
 
-import { useState, use, useEffect } from 'react'
+import { useState, useEffect } from 'react'
+import { useParams } from 'next/navigation'
 import type { Phase02Output } from '@/lib/schemas/phase-02.schema'
-
-interface Props {
-  params: Promise<{ id: string }>
-}
+import { PhaseChat } from '@/components/PhaseChat'
 
 const PRIORITY_COLOR: Record<string, string> = {
   high: 'bg-red-100 text-red-700',
@@ -19,8 +17,8 @@ const PRIORITY_LABEL: Record<string, string> = {
   low: '낮음',
 }
 
-export default function Phase2Page({ params }: Props) {
-  const { id: eventId } = use(params)
+export default function Phase2Page() {
+  const { id: eventId } = useParams<{ id: string }>()
   const [staffCount, setStaffCount] = useState(5)
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<Phase02Output | null>(null)
@@ -281,6 +279,13 @@ export default function Phase2Page({ params }: Props) {
           </div>
         </div>
       )}
+
+      <PhaseChat
+        phaseNumber={2}
+        eventId={eventId}
+        currentOutput={result as Record<string, unknown> | null}
+        onApply={updated => setResult(updated as Phase02Output)}
+      />
     </main>
   )
 }

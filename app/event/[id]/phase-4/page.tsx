@@ -1,12 +1,10 @@
 'use client'
 
-import { useState, use, useEffect } from 'react'
+import { useState, useEffect } from 'react'
+import { useParams } from 'next/navigation'
 import type { Phase04Output, SpeakerInput } from '@/lib/schemas/phase-04.schema'
+import { PhaseChat } from '@/components/PhaseChat'
 import type { Phase04SourcingOutput, SpeakerCandidate } from '@/lib/schemas/phase-04-sourcing.schema'
-
-interface Props {
-  params: Promise<{ id: string }>
-}
 
 type BudgetTier = 'premium' | 'standard' | 'economy'
 
@@ -42,8 +40,8 @@ function CopyBtn({ text }: { text: string }) {
   )
 }
 
-export default function Phase4Page({ params }: Props) {
-  const { id: eventId } = use(params)
+export default function Phase4Page() {
+  const { id: eventId } = useParams<{ id: string }>()
   const [speakers, setSpeakers] = useState<SpeakerInput[]>([{ ...EMPTY_SPEAKER }])
   const [budget, setBudget] = useState<BudgetTier | ''>('')
   const [loading, setLoading] = useState(false)
@@ -506,6 +504,14 @@ export default function Phase4Page({ params }: Props) {
           ))}
         </div>
       )}
+
+      <PhaseChat
+        phaseNumber={4}
+        eventId={eventId}
+        currentOutput={result as Record<string, unknown> | null}
+        context={`현재 열린 연사: ${openIndex}번째, 활성 탭: ${activeTab[openIndex] ?? 'email'}`}
+        onApply={updated => setResult(updated as Phase04Output)}
+      />
     </main>
   )
 }

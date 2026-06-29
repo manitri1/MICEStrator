@@ -1,11 +1,9 @@
 'use client'
 
-import { useState, use, useEffect } from 'react'
+import { useState, useEffect } from 'react'
+import { useParams } from 'next/navigation'
 import type { Phase06Output, SurveyResponse } from '@/lib/schemas/phase-06.schema'
-
-interface Props {
-  params: Promise<{ id: string }>
-}
+import { PhaseChat } from '@/components/PhaseChat'
 
 type TabKey = 'kpi' | 'sentiment' | 'persona' | 'recommendations'
 
@@ -65,8 +63,8 @@ function KpiCard({ label, value, sub }: { label: string; value: string | number;
   )
 }
 
-export default function Phase6Page({ params }: Props) {
-  const { id: eventId } = use(params)
+export default function Phase6Page() {
+  const { id: eventId } = useParams<{ id: string }>()
   const [targetAttendees, setTargetAttendees] = useState('')
   const [totalRegistered, setTotalRegistered] = useState('')
   const [actualAttended, setActualAttended] = useState('')
@@ -493,6 +491,13 @@ export default function Phase6Page({ params }: Props) {
           )}
         </div>
       )}
+
+      <PhaseChat
+        phaseNumber={6}
+        eventId={eventId}
+        currentOutput={result as Record<string, unknown> | null}
+        onApply={updated => setResult(updated as Phase06Output)}
+      />
     </main>
   )
 }
