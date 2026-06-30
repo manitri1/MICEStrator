@@ -1,8 +1,11 @@
-// scripts/generate-pitch-deck.js
+// scripts/generate-pitch-deck.mjs
 // MICEstrator 피치덱 → PPTX 생성
 
-const PptxGenJS = require('pptxgenjs')
-const path = require('path')
+import PptxGenJS from 'pptxgenjs'
+import path from 'path'
+import { fileURLToPath } from 'url'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const pptx = new PptxGenJS()
 
