@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { eq, and } from 'drizzle-orm'
+import { eq, and, desc } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { phaseResults, brandMemory } from '@/lib/db/schema'
 import { Phase01OutputSchema } from '@/lib/schemas/phase-01.schema'
@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
     .select()
     .from(phaseResults)
     .where(and(eq(phaseResults.eventId, eventId), eq(phaseResults.phaseNumber, phaseNumber)))
-    .orderBy(phaseResults.completedAt)
+    .orderBy(desc(phaseResults.completedAt))
     .limit(1)
 
   if (rows.length === 0) {
@@ -92,7 +92,7 @@ export async function PUT(req: NextRequest) {
     .select()
     .from(phaseResults)
     .where(and(eq(phaseResults.eventId, eventId), eq(phaseResults.phaseNumber, phaseNumber)))
-    .orderBy(phaseResults.completedAt)
+    .orderBy(desc(phaseResults.completedAt))
     .limit(1)
 
   if (rows.length === 0) {

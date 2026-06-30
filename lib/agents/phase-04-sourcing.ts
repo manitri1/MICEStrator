@@ -2,7 +2,7 @@ import { generateObject } from 'ai'
 import { openai } from '@ai-sdk/openai'
 import { db } from '../db'
 import { phaseResults } from '../db/schema'
-import { eq, and } from 'drizzle-orm'
+import { eq, and, desc } from 'drizzle-orm'
 import type { Phase01Output } from '../schemas/phase-01.schema'
 import {
   Phase04SourcingOutputSchema,
@@ -35,6 +35,7 @@ export async function runPhase04Sourcing(input: Phase04SourcingInput): Promise<P
     .select()
     .from(phaseResults)
     .where(and(eq(phaseResults.eventId, input.eventId), eq(phaseResults.phaseNumber, 1)))
+    .orderBy(desc(phaseResults.completedAt))
     .limit(1)
 
   if (rows.length === 0) {

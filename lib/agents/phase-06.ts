@@ -1,6 +1,6 @@
 import { generateObject } from 'ai'
 import { openai } from '@ai-sdk/openai'
-import { eq, and } from 'drizzle-orm'
+import { eq, and, desc } from 'drizzle-orm'
 import { PHASE06_SYSTEM_PROMPT } from '@/lib/prompts/phase-06.system-prompt'
 import {
   Phase06InputSchema,
@@ -26,6 +26,7 @@ export async function runPhase6(input: Phase06Input): Promise<Phase06Output> {
         eq(phaseResults.phaseNumber, 1)
       )
     )
+    .orderBy(desc(phaseResults.completedAt))
     .limit(1)
 
   if (phase1Rows.length === 0) {
