@@ -15,7 +15,7 @@ export function PrintControls({ eventId, eventName }: Props) {
     setPdfLoading(true)
     try {
       const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
-        import('html2canvas'),
+        import('html2canvas-pro'),
         import('jspdf'),
       ])
 
@@ -52,7 +52,8 @@ export function PrintControls({ eventId, eventName }: Props) {
       }
 
       pdf.save(`${eventName}-report.pdf`)
-    } catch {
+    } catch (err) {
+      console.error('[PDF 저장 오류]', err)
       alert('PDF 저장 중 오류가 발생했습니다.')
     } finally {
       setPdfLoading(false)
