@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import type { Phase02Output } from '@/lib/schemas/phase-02.schema'
 import { PhaseChat } from '@/components/PhaseChat'
 import { PhaseStaleBanner } from '@/components/PhaseStaleBanner'
+import { EventSummaryBanner } from '@/components/EventSummaryBanner'
 
 const PRIORITY_COLOR: Record<string, string> = {
   high: 'bg-red-100 text-red-700',
@@ -26,6 +27,9 @@ export default function Phase2Page() {
   const [error, setError] = useState<string | null>(null)
   const [staledPhases, setStaledPhases] = useState<number[]>([])
   const [activeTab, setActiveTab] = useState<'wbs' | 'milestones' | 'departments'>('departments')
+  const [isStale, setIsStale] = useState(false)
+  const [regenSuccess, setRegenSuccess] = useState(false)
+  const formRef = useRef<HTMLFormElement>(null)
 
   useEffect(() => {
     fetch(`/api/phase-result?eventId=${eventId}&phase=2`)
@@ -34,10 +38,25 @@ export default function Phase2Page() {
       .catch(() => {})
   }, [eventId])
 
+  useEffect(() => {
+    // 페이지 로드 시 Phase 1과의 일관성 체크 (REQ-UI-006)
+    fetch(`/api/phase-staleness?eventId=${eventId}&phase=2`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data?.isStale) setIsStale(true) })
+      .catch(() => {}) // 실패 시 무시 (graceful degradation)
+  }, [eventId])
+
+  // 재생성 버튼 클릭 시 폼 즉시 제출 (REQ-UI-008)
+  function handleRegen() {
+    formRef.current?.requestSubmit()
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    const wasStale = isStale
     setLoading(true)
     setError(null)
+    setRegenSuccess(false)
 
     try {
       const res = await fetch('/api/agents/phase-02', {
@@ -52,6 +71,10 @@ export default function Phase2Page() {
       }
 
       setResult(await res.json())
+      if (wasStale) {
+        setIsStale(false)
+        setRegenSuccess(true)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.')
     } finally {
@@ -61,6 +84,24 @@ export default function Phase2Page() {
 
   return (
     <main className="max-w-4xl mx-auto px-4 py-10 space-y-8">
+      {/* 행사 요약 배너 — Phase 1~4 요약 정보를 비동기 로드하여 표시 (REQ-SUMMARY-014) */}
+      <EventSummaryBanner eventId={eventId} />
+      {/* Phase 1 갱신 시 구버전 기반 알림 배너 (REQ-UI-006) */}
+      {isStale && (
+        <PhaseStaleBanner
+          editedPhase={1}
+          affectedPhases={[2]}
+          onDismiss={() => setIsStale(false)}
+          reason="phase-rerun"
+          onRegen={handleRegen}
+        />
+      )}
+      {regenSuccess && (
+        <div className="flex items-center gap-2 p-4 bg-green-50 border border-green-200 rounded-xl text-sm text-green-700">
+          <span>✓</span>
+          <span>변경된 내용이 반영되었습니다.</span>
+        </div>
+      )}
       <div>
         <h1 className="text-2xl font-bold">Phase 2 — WBS & 역할 분담</h1>
         <p className="mt-1 text-sm text-gray-500">
@@ -69,7 +110,7 @@ export default function Phase2Page() {
       </div>
 
       {/* 입력 폼 */}
-      <form onSubmit={handleSubmit} className="bg-white border rounded-xl p-6 shadow-sm space-y-4">
+      <form ref={formRef} onSubmit={handleSubmit} className="bg-white border rounded-xl p-6 shadow-sm space-y-4">
         <div>
           <label htmlFor="staffCount" className="block text-sm font-medium mb-1">
             총 가용 인력 수 <span className="text-red-500">*</span>

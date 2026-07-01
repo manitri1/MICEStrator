@@ -1,10 +1,14 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import type { Phase06Output, SurveyResponse } from '@/lib/schemas/phase-06.schema'
+import type { Phase01Output } from '@/lib/schemas/phase-01.schema'
 import { PhaseChat } from '@/components/PhaseChat'
 import { PhaseStaleBanner } from '@/components/PhaseStaleBanner'
+import { CanvasPromptModal } from '@/components/CanvasPromptModal'
+import { EventSummaryBanner } from '@/components/EventSummaryBanner'
+import { buildDashboardPrompt } from '@/lib/canvas/prompt-builder'
 
 type TabKey = 'kpi' | 'sentiment' | 'persona' | 'recommendations'
 
@@ -84,6 +88,15 @@ export default function Phase6Page() {
   const [error, setError] = useState<string | null>(null)
   const [staledPhases, setStaledPhases] = useState<number[]>([])
   const [activeTab, setActiveTab] = useState<TabKey>('kpi')
+  const [isStale, setIsStale] = useState(false)
+  const [regenSuccess, setRegenSuccess] = useState(false)
+  const formRef = useRef<HTMLFormElement>(null)
+
+  // Canvas 대시보드 프롬프트 관련 상태 (REQ-PROMPT-006~009)
+  const [canvasLoading, setCanvasLoading] = useState(false)
+  const [canvasError, setCanvasError] = useState<string | null>(null)
+  const [canvasPrompt, setCanvasPrompt] = useState<string | null>(null)
+  const [canvasModalOpen, setCanvasModalOpen] = useState(false)
 
   useEffect(() => {
     fetch(`/api/phase-result?eventId=${eventId}&phase=6`)
@@ -91,6 +104,19 @@ export default function Phase6Page() {
       .then(data => { if (data) setResult(data) })
       .catch(() => {})
   }, [eventId])
+
+  useEffect(() => {
+    // 페이지 로드 시 Phase 1과의 일관성 체크 (REQ-UI-006)
+    fetch(`/api/phase-staleness?eventId=${eventId}&phase=6`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data?.isStale) setIsStale(true) })
+      .catch(() => {}) // 실패 시 무시 (graceful degradation)
+  }, [eventId])
+
+  // 재생성 버튼 클릭 시 폼 즉시 제출 (REQ-UI-008)
+  function handleRegen() {
+    formRef.current?.requestSubmit()
+  }
 
   function addSurvey() {
     if (surveys.length < 20) setSurveys(prev => [...prev, { rating: 4, comment: '' }])
@@ -104,8 +130,31 @@ export default function Phase6Page() {
     setSurveys(prev => prev.map((s, idx) => (idx === i ? { ...s, [field]: value } : s)))
   }
 
+  // Canvas 대시보드 프롬프트 생성 핸들러 (REQ-PROMPT-007)
+  // Phase 1 결과만 lazy fetch 후 buildDashboardPrompt 실행 (brandMemory 불필요)
+  async function handleCanvasPrompt() {
+    if (!result) return
+    setCanvasLoading(true)
+    setCanvasError(null)
+
+    try {
+      const phase1Res = await fetch(`/api/phase-result?eventId=${eventId}&phase=1`)
+      const phase1Data: Phase01Output | null = await phase1Res.json()
+
+      // Phase 1 부재 시에도 "미입력" fallback으로 프롬프트 생성 (REQ-PROMPT-015)
+      const prompt = buildDashboardPrompt(phase1Data, result)
+      setCanvasPrompt(prompt)
+      setCanvasModalOpen(true)
+    } catch {
+      setCanvasError('프롬프트 생성 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.')
+    } finally {
+      setCanvasLoading(false)
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    const wasStale = isStale
     const validSurveys = surveys.filter(s => s.comment.trim() !== '')
     if (validSurveys.length === 0) {
       setError('설문 응답을 최소 1건 이상 입력해주세요.')
@@ -114,6 +163,7 @@ export default function Phase6Page() {
 
     setLoading(true)
     setError(null)
+    setRegenSuccess(false)
 
     const body: Record<string, unknown> = {
       eventId,
@@ -144,6 +194,10 @@ export default function Phase6Page() {
       }
       setResult(await res.json())
       setActiveTab('kpi')
+      if (wasStale) {
+        setIsStale(false)
+        setRegenSuccess(true)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.')
     } finally {
@@ -153,6 +207,24 @@ export default function Phase6Page() {
 
   return (
     <main className="max-w-3xl mx-auto px-4 py-10 space-y-8">
+      {/* 행사 요약 배너 — Phase 1~4 요약 정보를 비동기 로드하여 표시 (REQ-SUMMARY-014) */}
+      <EventSummaryBanner eventId={eventId} />
+      {/* Phase 1 갱신 시 구버전 기반 알림 배너 (REQ-UI-006) */}
+      {isStale && (
+        <PhaseStaleBanner
+          editedPhase={1}
+          affectedPhases={[6]}
+          onDismiss={() => setIsStale(false)}
+          reason="phase-rerun"
+          onRegen={handleRegen}
+        />
+      )}
+      {regenSuccess && (
+        <div className="flex items-center gap-2 p-4 bg-green-50 border border-green-200 rounded-xl text-sm text-green-700">
+          <span>✓</span>
+          <span>변경된 내용이 반영되었습니다.</span>
+        </div>
+      )}
       <div>
         <h1 className="text-2xl font-bold">Phase 6 — 사후 관리 & 효과 측정</h1>
         <p className="mt-1 text-sm text-gray-500">
@@ -161,7 +233,7 @@ export default function Phase6Page() {
       </div>
 
       {/* 입력 폼 */}
-      <form onSubmit={handleSubmit} className="bg-white border rounded-xl p-6 shadow-sm space-y-6">
+      <form ref={formRef} onSubmit={handleSubmit} className="bg-white border rounded-xl p-6 shadow-sm space-y-6">
         {/* 참가자 현황 */}
         <div>
           <h3 className="text-sm font-semibold mb-3 text-gray-800">참가자 현황</h3>
@@ -268,6 +340,8 @@ export default function Phase6Page() {
                 <select
                   disabled={loading}
                   value={s.rating}
+                  title={`응답 ${i + 1} 만족도 평점`}
+                  aria-label={`응답 ${i + 1} 만족도 평점`}
                   onChange={e => updateSurvey(i, 'rating', Number(e.target.value))}
                   className="w-20 flex-shrink-0 border rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
                 >
@@ -325,6 +399,22 @@ export default function Phase6Page() {
             >
               보고서 발행
             </a>
+          )}
+        </div>
+
+        {/* Canvas 대시보드 프롬프트 버튼 (REQ-PROMPT-006, 009) */}
+        <div className="border-t pt-4">
+          <button
+            type="button"
+            disabled={!result || canvasLoading}
+            onClick={handleCanvasPrompt}
+            title={!result ? 'Phase 6 실행 후 사용 가능합니다' : 'Gemini Canvas용 대시보드 프롬프트 생성'}
+            className="w-full py-2.5 border border-purple-400 text-purple-700 bg-purple-50 text-sm font-medium rounded-lg hover:bg-purple-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            {canvasLoading ? '생성 중...' : 'Canvas 대시보드 프롬프트'}
+          </button>
+          {canvasError && (
+            <p className="mt-2 text-xs text-red-600">{canvasError}</p>
           )}
         </div>
       </form>
@@ -508,6 +598,16 @@ export default function Phase6Page() {
           setStaledPhases(affected)
         }}
       />
+
+      {/* Canvas 대시보드 프롬프트 모달 (REQ-PROMPT-008) */}
+      {canvasPrompt && (
+        <CanvasPromptModal
+          isOpen={canvasModalOpen}
+          onClose={() => setCanvasModalOpen(false)}
+          prompt={canvasPrompt}
+          title="Canvas 대시보드 프롬프트"
+        />
+      )}
     </main>
   )
 }

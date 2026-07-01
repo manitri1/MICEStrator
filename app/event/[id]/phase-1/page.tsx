@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation'
 import type { Phase01Output } from '@/lib/schemas/phase-01.schema'
 import { PhaseChat } from '@/components/PhaseChat'
 import { PhaseStaleBanner } from '@/components/PhaseStaleBanner'
+import { EventSummaryBanner } from '@/components/EventSummaryBanner'
 
 type PrepPeriod = '3months' | '6months' | '12months'
 type EventScale = 'small' | 'medium' | 'large'
@@ -34,7 +35,15 @@ export default function Phase1Page() {
   useEffect(() => {
     fetch(`/api/phase-result?eventId=${eventId}&phase=1`)
       .then(r => r.json())
-      .then(data => { if (data) setResult(data) })
+      .then(data => {
+        if (data) {
+          setResult(data)
+          // 이전 실행의 희망 분야 복원 (패스스루 필드)
+          if (typeof data.industry === 'string' && data.industry) {
+            setIndustry(data.industry)
+          }
+        }
+      })
       .catch(() => {})
   }, [eventId])
 
@@ -60,8 +69,12 @@ export default function Phase1Page() {
         throw new Error(data.error ?? '에이전트 실행에 실패했습니다.')
       }
 
-      const data: Phase01Output = await res.json()
+      const data: Phase01Output & { affectedDownstream?: number[] } = await res.json()
       setResult(data)
+      // Phase 1 재실행 완료 시 하위 영향 Phase 알림 표시 (REQ-UI-004)
+      if (Array.isArray(data.affectedDownstream) && data.affectedDownstream.length > 0) {
+        setStaledPhases(data.affectedDownstream)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.')
     } finally {
@@ -71,6 +84,8 @@ export default function Phase1Page() {
 
   return (
     <main className="max-w-3xl mx-auto px-4 py-10 space-y-8">
+      {/* 행사 요약 배너 — Phase 1~4 요약 정보를 비동기 로드하여 표시 (REQ-SUMMARY-014) */}
+      <EventSummaryBanner eventId={eventId} />
       <div>
         <h1 className="text-2xl font-bold">Phase 1 — 인텔리전스 토대 구축</h1>
         <p className="mt-1 text-sm text-gray-500">

@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import type { Phase04Output, SpeakerInput } from '@/lib/schemas/phase-04.schema'
 import { PhaseChat } from '@/components/PhaseChat'
 import { PhaseStaleBanner } from '@/components/PhaseStaleBanner'
 import type { Phase04SourcingOutput, SpeakerCandidate } from '@/lib/schemas/phase-04-sourcing.schema'
+import { EventSummaryBanner } from '@/components/EventSummaryBanner'
 
 type BudgetTier = 'premium' | 'standard' | 'economy'
 
@@ -54,6 +55,9 @@ export default function Phase4Page() {
   const [sourcingLoading, setSourcingLoading] = useState(false)
   const [sourcingCandidates, setSourcingCandidates] = useState<Phase04SourcingOutput | null>(null)
   const [sourcingError, setSourcingError] = useState<string | null>(null)
+  const [isStale, setIsStale] = useState(false)
+  const [regenSuccess, setRegenSuccess] = useState(false)
+  const formRef = useRef<HTMLFormElement>(null)
 
   useEffect(() => {
     fetch(`/api/phase-result?eventId=${eventId}&phase=4`)
@@ -61,6 +65,19 @@ export default function Phase4Page() {
       .then(data => { if (data) setResult(data) })
       .catch(() => {})
   }, [eventId])
+
+  useEffect(() => {
+    // 페이지 로드 시 Phase 1과의 일관성 체크 (REQ-UI-006)
+    fetch(`/api/phase-staleness?eventId=${eventId}&phase=4`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data?.isStale) setIsStale(true) })
+      .catch(() => {}) // 실패 시 무시 (graceful degradation)
+  }, [eventId])
+
+  // 재생성 버튼 클릭 시 폼 즉시 제출 (REQ-UI-008)
+  function handleRegen() {
+    formRef.current?.requestSubmit()
+  }
 
   function updateSpeaker(i: number, field: keyof SpeakerInput, value: string | boolean) {
     setSpeakers(prev => prev.map((s, idx) => idx === i ? { ...s, [field]: value } : s))
@@ -76,8 +93,10 @@ export default function Phase4Page() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    const wasStale = isStale
     setLoading(true)
     setError(null)
+    setRegenSuccess(false)
 
     try {
       const res = await fetch('/api/agents/phase-04', {
@@ -99,6 +118,10 @@ export default function Phase4Page() {
       setActiveTab({ 0: 'email' })
       // 확정 연사 목록 저장 (재방문 시 복원용)
       localStorage.setItem(`confirmed-speakers-${eventId}`, JSON.stringify(speakers))
+      if (wasStale) {
+        setIsStale(false)
+        setRegenSuccess(true)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.')
     } finally {
@@ -151,6 +174,24 @@ export default function Phase4Page() {
 
   return (
     <main className="max-w-3xl mx-auto px-4 py-10 space-y-8">
+      {/* 행사 요약 배너 — Phase 1~4 요약 정보를 비동기 로드하여 표시 (REQ-SUMMARY-014) */}
+      <EventSummaryBanner eventId={eventId} />
+      {/* Phase 1 갱신 시 구버전 기반 알림 배너 (REQ-UI-006) */}
+      {isStale && (
+        <PhaseStaleBanner
+          editedPhase={1}
+          affectedPhases={[4]}
+          onDismiss={() => setIsStale(false)}
+          reason="phase-rerun"
+          onRegen={handleRegen}
+        />
+      )}
+      {regenSuccess && (
+        <div className="flex items-center gap-2 p-4 bg-green-50 border border-green-200 rounded-xl text-sm text-green-700">
+          <span>✓</span>
+          <span>변경된 내용이 반영되었습니다.</span>
+        </div>
+      )}
       <div>
         <h1 className="text-2xl font-bold">Phase 4 — 연사 소싱 & 아웃리치</h1>
         <p className="mt-1 text-sm text-gray-500">
@@ -251,7 +292,7 @@ export default function Phase4Page() {
         )}
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form ref={formRef} onSubmit={handleSubmit} className="space-y-5">
         {/* 연사 목록 */}
         <div className="space-y-4">
           {speakers.map((spk, i) => (

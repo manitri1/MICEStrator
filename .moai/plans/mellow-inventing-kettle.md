@@ -1,173 +1,157 @@
-# Phase 수정 워크플로우 개선 계획
+# Phase 4 연사 후보 — 실존 인물 탐색 + 강연 링크 첨부
 
 ## Context
 
-PhaseChat(부분 편집)으로 결과를 수정하는 흐름이 사용자에게 모호하게 느껴짐.
-구체적으로 4가지 UX 문제가 식별됨:
+Phase-04-Sourcing은 GPT-4o가 허구적(archetypal) 연사 후보를 생성한다. 실존하는
+인물을 찾지 못하고 강연 링크가 없어, 실제 섭외 활용도가 낮다.
 
-1. 상위 Phase 수정 후 하위 Phase에 반영 여부가 불명확
-2. 배열 항목(페르소나·WBS 태스크·연사 등) 추가/삭제 불가
-3. 오류 발생 시 기술적 메시지만 표시 (사용자 이해 불가)
-4. 채팅 히스토리가 새로고침 시 사라짐
-
-→ 이 4가지를 구현하여 워크플로우 명확성을 높인다.
-
-> **현재 구현 완료 상태**: PhaseChat, ScreenshotCapture, PUT API, Phase 1~6 통합 모두 완료.
-> 이 플랜은 그 위에 UX 개선 레이어를 추가하는 것.
+요구사항:
+1. 실존하는 적절한 인물을 연사 후보로 탐색
+2. 각 후보에 최근 강연 링크 (YouTube·TED·국내 플랫폼) 첨부
 
 ---
 
-## 개선 항목 및 구현 접근
+## 접근 방식: Tavily 웹검색 + GPT-4o 3단계 파이프라인
 
-### P1 — 하위 Phase 재실행 권장 배너
+### 선택 이유 (Tavily)
 
-**목표**: Phase N을 편집하면 영향받는 하위 Phase 목록을 배너로 표시.
+| 옵션 | 판단 |
+|---|---|
+| **Tavily API** | AI 에이전트 전용 검색, 무료 1,000회/월, REST API (SDK 불필요), 결과에 URL 포함 → **채택** |
+| OpenAI web_search | Responses API 필요 — `generateObject`와 직접 결합 불가 |
+| Brave Search | AI 에이전트 포맷 지원 부족 |
 
-**Phase 영향 관계**:
+### 3단계 파이프라인
+
+```
+[Stage 1] GPT-4o — 검색 기준 생성
+  입력: Phase 1 컨텍스트 (행사명, 키워드, 페르소나)
+  출력: { speakerTier, expertise, searchQuery }[]  ← 실명 없음, 유형 기준만
+
+[Stage 2] Tavily — 실존 인물 + 강연 URL 탐색 (병렬)
+  요청 A: "{searchQuery} 강사 전문가 프로필"
+  요청 B: "{searchQuery} 강연 site:youtube.com OR site:ted.com"
+  출력: 원시 검색 결과 (title, url, content snippet)
+
+[Stage 3] GPT-4o — 검색 결과 구조화
+  입력: Stage 1 기준 + Stage 2 원시 결과
+  출력: SpeakerCandidateSchema[] (lectureLinks 포함)
+```
+
+---
+
+## 스키마 변경 (`lib/schemas/phase-04-sourcing.schema.ts`)
+
 ```typescript
-// app/api/phase-result/route.ts 에 추가
-const PHASE_DOWNSTREAM: Record<number, number[]> = {
-  1: [2, 3, 4, 5, 6],  // 기획 변경 → 모든 하위 영향
-  2: [6],               // WBS 변경 → ROI 분석 영향
-  3: [4, 5],            // 브랜드 변경 → 연사이메일·마케팅 영향
-  4: [5, 6],            // 연사 변경 → 마케팅·ROI 영향
-  5: [6],               // 마케팅 변경 → ROI 영향
-  6: [],                // 마지막 Phase
+const LectureLinkSchema = z.object({
+  title: z.string(),
+  url: z.string().url(),
+  platform: z.string(), // "YouTube", "TED", "네이버TV" 등
+  year: z.number().optional(),
+})
+
+// SpeakerCandidateSchema에 추가
+lectureLinks: z.array(LectureLinkSchema).default([]),
+profileUrl: z.string().url().optional(),
+isRealPerson: z.boolean().default(false),
+```
+
+---
+
+## 수정/신규 파일 목록
+
+| 파일 | 유형 | 역할 |
+|---|---|---|
+| `lib/search/tavily.ts` | 신규 | Tavily REST API 클라이언트 (fetch 기반, SDK 불필요) |
+| `lib/schemas/phase-04-sourcing.schema.ts` | 수정 | LectureLinkSchema + 3개 필드 추가 |
+| `lib/prompts/phase-04-sourcing.system-prompt.ts` | 수정 | Stage 1 (기준 생성) + Stage 3 (결과 구조화) 프롬프트 분리 |
+| `lib/agents/phase-04-sourcing.ts` | 수정 | 3단계 파이프라인 구현 |
+| `app/event/[id]/phase-4/page.tsx` | 수정 | 강연 링크 칩 UI 추가 |
+| `.env.local` | 수동 | `TAVILY_API_KEY=tvly-...` (키 없으면 fallback) |
+
+---
+
+## 핵심 구현 상세
+
+### `lib/search/tavily.ts`
+
+```typescript
+interface TavilyResult { title: string; url: string; content: string; score: number }
+
+export async function tavilySearch(query: string, maxResults = 5): Promise<TavilyResult[]> {
+  if (!process.env.TAVILY_API_KEY) return []
+  const res = await fetch('https://api.tavily.com/search', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ api_key: process.env.TAVILY_API_KEY, query, max_results: maxResults }),
+  })
+  const data = await res.json()
+  return data.results ?? []
 }
 ```
 
-**PUT 응답 구조 변경**:
+API 키 미설정 시 `[]` 반환 → Stage 3에서 AI 생성 후보로 graceful fallback.
+
+### `lib/agents/phase-04-sourcing.ts` — 3단계 파이프라인
+
 ```typescript
-// 기존: { updated: PhaseOutput }
-// 변경: { updated: PhaseOutput, affectedDownstream: number[] }
-```
+// Stage 1: 검색 기준 생성
+const { object: criteria } = await generateObject({
+  model: openai('gpt-4o'),
+  schema: Phase04SourcingCriteriaSchema,
+  system: PHASE04_SOURCING_CRITERIA_PROMPT,
+  prompt: userPrompt,  // 기존 Phase 1 컨텍스트
+})
 
-**신규 파일**: `components/PhaseStaleBanner.tsx`
-```tsx
-// props: affectedPhases: number[], onDismiss: () => void
-// 표시: "Phase 1 수정이 Phase 3·4·5에 영향을 줍니다. 재실행을 권장합니다."
-// 링크: 각 Phase 페이지로 이동 버튼
-```
+// Stage 2: 병렬 Tavily 탐색
+const searchResults = await Promise.all(
+  criteria.candidates.map(async (c) => {
+    const [profiles, lectures] = await Promise.all([
+      tavilySearch(`${c.searchQuery} 강사 전문가 프로필`),
+      tavilySearch(`${c.searchQuery} 강연 site:youtube.com OR site:ted.com OR site:tv.naver.com`),
+    ])
+    return { criteria: c, profiles, lectures }
+  })
+)
 
-**수정 파일**:
-- `app/api/phase-result/route.ts` — PUT 응답에 `affectedDownstream` 추가
-- `components/PhaseChat.tsx` — `onApply(updated, affectedDownstream)` 시그니처 확장
-- `app/event/[id]/phase-{1~6}/page.tsx` — `PhaseStaleBanner` 렌더링 (6개 모두)
-
----
-
-### P2 — 배열 추가·삭제 지원 (deepMerge 확장)
-
-**목표**: `$append`, `$remove` 연산자로 배열 항목을 추가·삭제.
-
-**연산자 스펙**:
-```typescript
-// 추가: 배열 끝에 항목 삽입
-{ "targetPersonas": { "$append": [{ name: "신규 페르소나", ... }] } }
-
-// 삭제: 인덱스 기준 항목 제거
-{ "wbsTasks": { "$remove": [2] } }  // 2번 인덱스 삭제
-```
-
-**deepMerge 확장** (`app/api/phase-result/route.ts` 내부):
-```typescript
-function deepMerge(existing: unknown, patch: unknown): unknown {
-  // 기존 로직 유지
-  // 추가: patch가 { $append: [...] } 형태면 배열 concat
-  // 추가: patch가 { $remove: [n] } 형태면 해당 인덱스 filter out
-}
-```
-
-**AI 시스템 프롬프트 업데이트** (`app/api/chat/phase-edit/route.ts`):
-- `$append`, `$remove` 연산자 설명 추가
-- "페르소나 추가" 요청 감지 시 `$append` 패치 생성 지시
-
-**수정 파일**:
-- `app/api/phase-result/route.ts` — deepMerge 함수 확장
-- `app/api/chat/phase-edit/route.ts` — 시스템 프롬프트에 연산자 설명 추가
-
----
-
-### P3 — 사용자 친화적 오류 메시지
-
-**목표**: Zod 검증 오류, 배열 조작 불가 등을 한국어 친화적으로 표시.
-
-**오류 변환 맵** (신규 `lib/phase-errors.ts`):
-```typescript
-const FRIENDLY_ERRORS: Record<string, string> = {
-  'Invalid hex color': 'hex 색상 형식(#RRGGBB)으로 입력해주세요. 예: #1A5276',
-  'Array length': '항목 수는 {min}~{max}개 사이여야 합니다',
-  'Required': '필수 항목이 비어 있습니다',
-}
-```
-
-**PUT 400 응답 개선** (`app/api/phase-result/route.ts`):
-```typescript
-// 기존: { error: zodError.message }
-// 변경: { error: friendlyMessage, details: zodError.issues }
-```
-
-**채팅 AI 프롬프트 가이드 추가** (`app/api/chat/phase-edit/route.ts`):
-```
-배열 추가/삭제 요청 감지 시:
-→ "$append/$remove 연산자 패치 생성" (P2 연동)
-→ 또는 "Phase 재실행이 필요합니다" 안내 메시지 반환
-```
-
-**수정 파일**:
-- 신규 `lib/phase-errors.ts` — 오류 변환 유틸
-- `app/api/phase-result/route.ts` — 친화적 오류 응답
-- `app/api/chat/phase-edit/route.ts` — 배열 조작 안내 프롬프트
-
----
-
-### P4 — 채팅 히스토리 DB 저장
-
-**목표**: PhaseChat 대화 기록을 DB에 저장해 새로고침 후에도 복원.
-
-**신규 테이블** (`lib/db/schema.ts` 추가):
-```typescript
-export const phaseChatLogs = pgTable('phase_chat_logs', {
-  id: uuid('id').defaultRandom().primaryKey(),
-  eventId: uuid('event_id').notNull().references(() => events.id, { onDelete: 'cascade' }),
-  phaseNumber: integer('phase_number').notNull(),
-  messages: jsonb('messages').notNull(), // ChatMessage[]
-  updatedAt: timestamp('updated_at').defaultNow(),
+// Stage 3: 검색 결과 → 구조화된 후보 목록
+const { object } = await generateObject({
+  model: openai('gpt-4o'),
+  schema: Phase04SourcingOutputSchema,
+  system: PHASE04_SOURCING_SYNTHESIS_PROMPT,
+  prompt: buildSynthesisPrompt(phase1, searchResults),
 })
 ```
 
-**신규 API** (`app/api/chat-logs/route.ts`):
-- `GET ?eventId=&phase=` — 히스토리 로드
-- `POST { eventId, phaseNumber, messages }` — 히스토리 저장 (전체 교체)
+### UI 변경 (`app/event/[id]/phase-4/page.tsx`)
 
-**PhaseChat 수정** (`components/PhaseChat.tsx`):
-- mount 시 `GET /api/chat-logs` 호출 → 기존 메시지 복원
-- 메시지 전송/수신 후 debounce(1s) → `POST /api/chat-logs` 저장
+후보 카드(`SpeakerCandidate` 렌더링 블록, 현재 약 199~231번째 줄)에 강연 링크 칩 추가:
 
-**수정 파일**:
-- `lib/db/schema.ts` — `phaseChatLogs` 테이블 추가
-- 신규 `app/api/chat-logs/route.ts` — GET/POST 핸들러
-- `components/PhaseChat.tsx` — 히스토리 로드·저장 로직
+```tsx
+{c.lectureLinks.length > 0 && (
+  <div className="flex flex-wrap gap-1.5 mt-2">
+    {c.lectureLinks.map((link, j) => (
+      <a key={j} href={link.url} target="_blank" rel="noopener noreferrer"
+         className="text-xs px-2 py-0.5 bg-blue-50 text-blue-700 rounded border border-blue-200 hover:bg-blue-100">
+        ▶ {link.platform}{link.year ? ` (${link.year})` : ''}
+      </a>
+    ))}
+  </div>
+)}
+```
 
 ---
 
-## 수정 파일 목록
+## Tavily API 키 설정
 
-| 파일 | 변경 유형 | 개선 항목 |
-|------|-----------|-----------|
-| `app/api/phase-result/route.ts` | 수정 | P1 (downstream), P2 (deepMerge), P3 (오류) |
-| `app/api/chat/phase-edit/route.ts` | 수정 | P2 (프롬프트), P3 (안내) |
-| `components/PhaseChat.tsx` | 수정 | P1 (onApply 시그니처), P4 (히스토리) |
-| `components/PhaseStaleBanner.tsx` | 신규 | P1 |
-| `lib/phase-errors.ts` | 신규 | P3 |
-| `lib/db/schema.ts` | 수정 | P4 |
-| `app/api/chat-logs/route.ts` | 신규 | P4 |
-| `app/event/[id]/phase-1/page.tsx` | 수정 | P1 (배너) |
-| `app/event/[id]/phase-2/page.tsx` | 수정 | P1 (배너) |
-| `app/event/[id]/phase-3/page.tsx` | 수정 | P1 (배너) |
-| `app/event/[id]/phase-4/page.tsx` | 수정 | P1 (배너) |
-| `app/event/[id]/phase-5/page.tsx` | 수정 | P1 (배너) |
-| `app/event/[id]/phase-6/page.tsx` | 수정 | P1 (배너) |
+사용자가 `.env.local`에 수동 추가:
+```
+TAVILY_API_KEY=tvly-xxxxxxxxxx
+```
+
+키 발급: https://tavily.com (무료 플랜 1,000회/월)
+
+키 미설정 → Stage 2 결과가 빈 배열 → Stage 3가 기존 AI 생성 후보만 반환 (graceful fallback).
 
 ---
 
@@ -177,18 +161,8 @@ export const phaseChatLogs = pgTable('phase_chat_logs', {
 npm run dev
 ```
 
-**P1 검증**:
-1. Phase 1 슬로건 수정 → 적용 → "Phase 2·3·4·5·6 재실행 권장" 배너 표시 확인
-2. 배너의 Phase 링크 클릭 → 해당 Phase 페이지 이동 확인
-
-**P2 검증**:
-1. "페르소나 4번째 추가해줘" 입력 → `$append` 패치 생성 → 적용 후 페르소나 4개 확인
-2. "첫 번째 WBS 태스크 삭제해줘" → `$remove: [0]` 패치 → 적용 후 태스크 감소 확인
-
-**P3 검증**:
-1. Phase 3에서 "색상을 파란색으로 변경해줘" → hex 패치 제안 확인
-2. 수동으로 잘못된 hex 전송 시 한국어 오류 메시지 확인
-
-**P4 검증**:
-1. Phase 1 채팅에서 대화 후 새로고침 → 대화 기록 복원 확인
-2. 다른 Phase로 이동 후 돌아왔을 때 기록 유지 확인
+1. `.env.local`에 `TAVILY_API_KEY` 추가 후 Phase 4 페이지 → "연사 후보 찾기" 클릭
+2. 후보 카드에 실존 인물 이름·소속 표시 확인
+3. 강연 링크 칩 클릭 → 실제 YouTube/TED 영상 연결 확인
+4. `isRealPerson: true` 후보에 "실존 확인" 뱃지 표시 확인
+5. `TAVILY_API_KEY` 미설정 시 → 기존 AI 생성 후보로 graceful fallback 확인

@@ -45,7 +45,8 @@ export async function POST(req: NextRequest) {
       outputJson: output,
     })
 
-    return NextResponse.json(output, { status: 200 })
+    // REQ-UI-010: Phase 1 완료 시 하위 영향 Phase 목록을 응답에 포함
+    return NextResponse.json({ ...output, affectedDownstream: [2, 3, 4, 5, 6] }, { status: 200 })
   } catch (err) {
     // REQ-040: 스키마 검증 실패 또는 AI 오류 시 DB 저장 없이 500
     const message = err instanceof z.ZodError

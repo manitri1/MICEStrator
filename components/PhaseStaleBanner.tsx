@@ -7,6 +7,10 @@ interface Props {
   editedPhase: number
   affectedPhases: number[]
   onDismiss: () => void
+  // Phase 재실행 완료 시 하위 Phase에 구버전 알림 (REQ-UI-004)
+  reason?: 'chat-edit' | 'phase-rerun'
+  // 재생성 버튼 클릭 핸들러 — reason === 'phase-rerun' 일 때만 사용
+  onRegen?: () => void
 }
 
 const PHASE_LABELS: Record<number, string> = {
@@ -18,9 +22,41 @@ const PHASE_LABELS: Record<number, string> = {
   6: 'Phase 6 (ROI분석)',
 }
 
-export function PhaseStaleBanner({ editedPhase, affectedPhases, onDismiss }: Props) {
+export function PhaseStaleBanner({ editedPhase, affectedPhases, onDismiss, reason = 'chat-edit', onRegen }: Props) {
   if (affectedPhases.length === 0) return null
 
+  // phase-rerun: Phase 상위가 갱신되어 이 Phase의 내용이 구버전에 기반함을 알림
+  if (reason === 'phase-rerun') {
+    return (
+      <div className="my-4 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm">
+        <span className="mt-0.5 text-amber-500">⚠️</span>
+        <div className="flex-1">
+          <p className="font-medium text-amber-800">
+            {PHASE_LABELS[editedPhase]}이(가) 갱신되어 이 Phase의 내용이 구버전에 기반합니다. 재생성을 권장합니다.
+          </p>
+          <div className="mt-2">
+            <button
+              type="button"
+              onClick={onRegen}
+              className="rounded-md border border-amber-300 bg-white px-2 py-0.5 text-xs font-medium text-amber-700 hover:bg-amber-100"
+            >
+              재생성
+            </button>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onDismiss}
+          className="ml-auto text-amber-400 hover:text-amber-600"
+          aria-label="닫기"
+        >
+          ✕
+        </button>
+      </div>
+    )
+  }
+
+  // chat-edit (기본값): 편집 후 하위 영향 Phase 이동 링크 표시
   const affectedLabel = affectedPhases.map(n => `Phase ${n}`).join(', ')
 
   return (

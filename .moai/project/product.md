@@ -84,6 +84,37 @@ MICEstrator는 **MICE(Meetings, Incentives, Conventions, Exhibitions) 행사 기
 | **POST /api/chat/phase-edit** | 스트리밍 편집 API (이미지 첨부 지원) |
 | **useParams 하이드레이션 수정** | Phase 1~6 페이지 `use(params)` → `useParams()` — React 이벤트 버그 수정 |
 
+## Phase 스테일 감지 & 재생성 워크플로우 (SPEC-UI-001)
+
+상위 Phase가 갱신되면 하위 Phase에 스테일 배너를 표시하고, 원클릭 재생성으로 최신 데이터로 갱신하는 UX.
+
+| 기능 | 설명 |
+|------|------|
+| **PhaseStaleBanner** | 상위 Phase 갱신 감지 시 "구버전 기반" 경고 배너 표시 |
+| **원클릭 재생성** | 배너의 "재생성" 버튼 클릭 → 폼 자동 제출 (`formRef.requestSubmit()`) |
+| **재생성 성공 메시지** | 재생성 완료 후 초록색 성공 메시지 표시 |
+| **reason prop** | `chat-edit` (채팅 편집 후) / `phase-rerun` (Phase 재실행 후) 원인 구분 |
+
+## 이벤트 요약 대시보드 (SPEC-SUMMARY-001)
+
+홈 대시보드에 Phase 1~4 결과를 집계해 행사 핵심 정보를 한눈에 표시하는 기능.
+
+| 기능 | 설명 |
+|------|------|
+| **EventSummaryBanner** | 행사명, 컨셉, 주요 연사, 마케팅 키워드를 홈에 배너로 표시 |
+| **GET /api/event-summary** | Phase 1~4 phaseResults를 집계해 EventSummary 타입으로 반환 |
+| **실시간 집계** | 최신 Phase 결과 기반 동적 업데이트 |
+
+## Canvas 랜딩페이지 프롬프트 (Phase 5)
+
+Phase 5 랜딩페이지 탭 내에 Gemini Canvas용 프롬프트 생성 기능이 인라인으로 통합됨.
+
+| 기능 | 설명 |
+|------|------|
+| **인라인 프롬프트 생성** | 랜딩페이지 탭 하단에서 바로 Canvas 프롬프트 생성 |
+| **복사 버튼** | 생성된 프롬프트를 한 번에 전체 복사 |
+| **재생성 지원** | 이미 생성된 프롬프트를 다시 생성 가능 |
+
 ## 비범위 (Out of Scope)
 
 - 실제 행사 현장 운영 시스템 (참가자 체크인, 현장 앱)

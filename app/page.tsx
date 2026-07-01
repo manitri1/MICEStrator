@@ -4,6 +4,8 @@ import { db } from '@/lib/db'
 import { events } from '@/lib/db/schema'
 import { desc } from 'drizzle-orm'
 import { NewEventForm } from '@/components/NewEventForm'
+import { getEventSummaryBatch } from '@/lib/summary/event-summary'
+import type { EventSummary } from '@/lib/summary/event-summary'
 
 const PHASES = [
   { num: 1, label: '행사 기획', short: 'P1' },
@@ -29,6 +31,9 @@ export default async function HomePage() {
     .from(events)
     .orderBy(desc(events.createdAt))
     .limit(100)
+
+  // 단일 배치 쿼리로 모든 이벤트 요약 조회 (REQ-SUMMARY-009: N+1 방지, 총 쿼리 수 = 2)
+  const summaryMap = await getEventSummaryBatch(eventList.map(e => e.id))
 
   return (
     <main className="min-h-screen bg-gray-50">
@@ -74,7 +79,21 @@ export default async function HomePage() {
           )}
 
           <div className="space-y-3">
-            {eventList.map(event => (
+            {eventList.map(event => {
+              // 해당 이벤트의 요약 정보 (없을 수도 있음)
+              const summary: EventSummary | undefined = summaryMap.get(event.id)
+              // 의미 있는 필드가 하나 이상인지 확인
+              const hasSummary = summary && (
+                summary.slogan ||
+                summary.preparationPeriod ||
+                summary.eventScale ||
+                summary.taskCount !== undefined ||
+                summary.milestoneCount !== undefined ||
+                summary.tone ||
+                (Array.isArray(summary.speakerNames) && summary.speakerNames.length > 0)
+              )
+
+              return (
               <div
                 key={event.id}
                 className="bg-white border rounded-xl p-5 hover:shadow-sm transition-shadow"
@@ -88,6 +107,46 @@ export default async function HomePage() {
                     {event.status ?? 'draft'}
                   </span>
                 </div>
+
+                {/* 행사 요약 칩 — Phase 1~4 데이터가 있을 때만 표시 */}
+                {hasSummary && (
+                  <div className="mt-2 flex flex-wrap gap-1.5 text-xs text-gray-500">
+                    {summary.slogan && (
+                      <span className="bg-gray-100 px-2 py-0.5 rounded-full italic truncate max-w-[160px]" title={summary.slogan}>
+                        &ldquo;{summary.slogan}&rdquo;
+                      </span>
+                    )}
+                    {summary.preparationPeriod && (
+                      <span className="bg-gray-100 px-2 py-0.5 rounded-full">
+                        준비기간: {summary.preparationPeriod}
+                      </span>
+                    )}
+                    {summary.eventScale && (
+                      <span className="bg-gray-100 px-2 py-0.5 rounded-full">
+                        {summary.eventScale}
+                      </span>
+                    )}
+                    {(summary.taskCount !== undefined || summary.milestoneCount !== undefined) && (
+                      <span className="bg-gray-100 px-2 py-0.5 rounded-full">
+                        {[
+                          summary.taskCount !== undefined ? `태스크 ${summary.taskCount}개` : null,
+                          summary.milestoneCount !== undefined ? `마일스톤 ${summary.milestoneCount}개` : null,
+                        ].filter(Boolean).join(' / ')}
+                      </span>
+                    )}
+                    {summary.tone && (
+                      <span className="bg-gray-100 px-2 py-0.5 rounded-full">
+                        톤: {summary.tone}
+                      </span>
+                    )}
+                    {Array.isArray(summary.speakerNames) && summary.speakerNames.length > 0 && (
+                      <span className="bg-gray-100 px-2 py-0.5 rounded-full">
+                        연사: {summary.speakerNames.slice(0, 2).join(', ')}
+                        {summary.speakerNames.length > 2 && ` +${summary.speakerNames.length - 2}명`}
+                      </span>
+                    )}
+                  </div>
+                )}
 
                 <div className="mt-4 flex flex-wrap gap-2">
                   {PHASES.map(p => (
@@ -108,7 +167,8 @@ export default async function HomePage() {
                   </a>
                 </div>
               </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       </div>

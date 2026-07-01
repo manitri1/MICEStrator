@@ -22,4 +22,5 @@ export const PHASE01_SYSTEM_PROMPT = `
 - 핵심 키워드(coreKeywords)는 3개 이상 8개 이하로 제한하십시오.
 - 페르소나 수는 반드시 1~3명 사이여야 합니다.
 - 지정된 JSON 스키마 구조를 엄격히 준수하여 출력하십시오.
+- preparationPeriod와 eventScale은 입력값을 그대로 반영하는 필드입니다. 임의 값을 생성하지 마십시오.
 `.trim()

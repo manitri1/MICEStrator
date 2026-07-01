@@ -36,6 +36,11 @@ export const Phase01OutputSchema = z.object({
   pestAnalysis: PestAnalysisSchema,
   // REQ-042: 타깃 페르소나 1~3명 강제
   targetPersonas: z.array(TargetPersonaSchema).min(1).max(3),
+  // REQ-SUMMARY-001: 입력값 패스스루 — LLM이 생성하는 값이 아님. optional()은 하위 호환성 보장.
+  preparationPeriod: z.enum(['3months', '6months', '12months']).optional(),
+  eventScale: z.enum(['small', 'medium', 'large']).optional(),
+  // 희망 분야 입력값 — 폼 복원용 패스스루. optional()은 하위 호환성 보장.
+  industry: z.string().optional(),
 })
 
 export type Phase01Output = z.infer<typeof Phase01OutputSchema>
