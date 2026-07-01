@@ -1,4 +1,5 @@
-import { generateObject } from 'ai'
+import { generateObject, jsonSchema } from 'ai'
+import { zodToJsonSchema } from 'zod-to-json-schema'
 import { openai } from '@ai-sdk/openai'
 import { eq, and, desc } from 'drizzle-orm'
 import { PHASE04_SYSTEM_PROMPT } from '@/lib/prompts/phase-04.system-prompt'
@@ -99,11 +100,12 @@ export async function runPhase4(input: Phase04Input): Promise<Phase04Output> {
 
   const { object } = await generateObject({
     model: openai('gpt-4o'),
-    schema: Phase04OutputSchema,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    schema: jsonSchema(zodToJsonSchema(Phase04OutputSchema as any) as Record<string, unknown>),
     temperature: 0.7,
     system: PHASE04_SYSTEM_PROMPT,
     prompt: userPrompt,
-  })
+  }) as { object: Phase04Output }
 
   return object
 }

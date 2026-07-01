@@ -1,4 +1,5 @@
-import { generateObject } from 'ai'
+import { generateObject, jsonSchema } from 'ai'
+import { zodToJsonSchema } from 'zod-to-json-schema'
 import { openai } from '@ai-sdk/openai'
 import { PHASE01_SYSTEM_PROMPT } from '@/lib/prompts/phase-01.system-prompt'
 import {
@@ -43,13 +44,15 @@ export async function runPhase1(input: Phase01Input): Promise<Phase01Output> {
     `위 정보를 바탕으로 MICE 행사 기획 전략을 수립하고 event_master 데이터를 생성해주세요.`,
   ].join('\n')
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { object } = await generateObject({
     model: openai('gpt-4o'),
-    schema: Phase01LLMSchema, // 패스스루 필드 제외한 스키마
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    schema: jsonSchema(zodToJsonSchema(Phase01LLMSchema as any) as Record<string, unknown>),
     temperature: 0.7,
     system: PHASE01_SYSTEM_PROMPT,
     prompt: userPrompt,
-  })
+  }) as { object: Omit<Phase01Output, 'preparationPeriod' | 'eventScale' | 'industry'> }
 
   // 패스스루 필드는 LLM 생성 없이 입력값을 그대로 병합 (REQ-SUMMARY-001)
   return {
