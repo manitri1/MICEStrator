@@ -1,5 +1,4 @@
 import { generateObject, jsonSchema } from 'ai'
-import { zodToJsonSchema } from 'zod-to-json-schema'
 import { z } from 'zod'
 import { openai } from '@ai-sdk/openai'
 import { db } from '../db'
@@ -63,7 +62,7 @@ ${phase1.planningRationale}`
   const { object: criteriaResult } = await generateObject({
     model: openai('gpt-4o'),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    schema: jsonSchema(zodToJsonSchema(Phase04SourcingCriteriaSchema as any) as Record<string, unknown>),
+    schema: jsonSchema((Phase04SourcingCriteriaSchema as any).toJSONSchema()),
     temperature: 0.7,
     system: PHASE04_SOURCING_CRITERIA_PROMPT,
     prompt: `다음 MICE 행사의 연사 검색 기준을 생성해 주세요.\n\n${eventContext}\n\n위 정보를 기반으로 행사에 최적화된 연사 유형 3~8개와 각 유형별 웹 검색 쿼리를 생성해 주세요.`,
@@ -134,7 +133,7 @@ ${item.lectureResults.length > 0
   const { object } = await generateObject({
     model: openai('gpt-4o'),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    schema: jsonSchema(zodToJsonSchema(Phase04SourcingOutputSchema as any) as Record<string, unknown>),
+    schema: jsonSchema((Phase04SourcingOutputSchema as any).toJSONSchema()),
     temperature: 0.7,
     system: PHASE04_SOURCING_SYNTHESIS_PROMPT,
     prompt: synthesisUserPrompt,

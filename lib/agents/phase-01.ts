@@ -1,5 +1,4 @@
 import { generateObject, jsonSchema } from 'ai'
-import { zodToJsonSchema } from 'zod-to-json-schema'
 import { openai } from '@ai-sdk/openai'
 import { PHASE01_SYSTEM_PROMPT } from '@/lib/prompts/phase-01.system-prompt'
 import {
@@ -48,7 +47,7 @@ export async function runPhase1(input: Phase01Input): Promise<Phase01Output> {
   const { object } = await generateObject({
     model: openai('gpt-4o'),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    schema: jsonSchema(zodToJsonSchema(Phase01LLMSchema as any) as Record<string, unknown>),
+    schema: jsonSchema((Phase01LLMSchema as any).toJSONSchema()),
     temperature: 0.7,
     system: PHASE01_SYSTEM_PROMPT,
     prompt: userPrompt,
