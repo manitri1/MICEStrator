@@ -7,6 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "bun test lib/",
+    "test:watch": "bun test --watch lib/",
+    "test:coverage": "bun test --coverage lib/",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push:pg",
     "db:studio": "drizzle-kit studio"
@@ -36,15 +39,20 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@testing-library/jest-dom": "^6.0.0",
+    "@testing-library/react": "^16.0.0",
     "@types/node": "^20",
     "@types/pg": "^8.20.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^4.0.0",
     "drizzle-kit": "^0.18.1",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
+    "jsdom": "^25.0.0",
     "pptxgenjs": "^4.0.1",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3.0.0"
   }
 }
