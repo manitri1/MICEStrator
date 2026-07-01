@@ -188,6 +188,7 @@ export default function Phase5Page() {
           editedPhase={1}
           affectedPhases={[5]}
           onDismiss={() => setIsStale(false)}
+          eventId={eventId}
           reason="phase-rerun"
           onRegen={handleRegen}
         />
@@ -482,6 +483,7 @@ export default function Phase5Page() {
         editedPhase={5}
         affectedPhases={staledPhases}
         onDismiss={() => setStaledPhases([])}
+        eventId={eventId}
       />
       <PhaseChat
         phaseNumber={5}

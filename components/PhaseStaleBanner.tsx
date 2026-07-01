@@ -7,6 +7,7 @@ interface Props {
   editedPhase: number
   affectedPhases: number[]
   onDismiss: () => void
+  eventId: string
   // Phase 재실행 완료 시 하위 Phase에 구버전 알림 (REQ-UI-004)
   reason?: 'chat-edit' | 'phase-rerun'
   // 재생성 버튼 클릭 핸들러 — reason === 'phase-rerun' 일 때만 사용
@@ -22,7 +23,7 @@ const PHASE_LABELS: Record<number, string> = {
   6: 'Phase 6 (ROI분석)',
 }
 
-export function PhaseStaleBanner({ editedPhase, affectedPhases, onDismiss, reason = 'chat-edit', onRegen }: Props) {
+export function PhaseStaleBanner({ editedPhase, affectedPhases, onDismiss, eventId, reason = 'chat-edit', onRegen }: Props) {
   if (affectedPhases.length === 0) return null
 
   // phase-rerun: Phase 상위가 갱신되어 이 Phase의 내용이 구버전에 기반함을 알림
@@ -73,7 +74,7 @@ export function PhaseStaleBanner({ editedPhase, affectedPhases, onDismiss, reaso
           {affectedPhases.map(n => (
             <a
               key={n}
-              href={`phase-${n}`}
+              href={`/event/${eventId}/phase-${n}`}
               className="rounded-md border border-amber-300 bg-white px-2 py-0.5 text-xs font-medium text-amber-700 hover:bg-amber-100"
             >
               Phase {n} 이동 →

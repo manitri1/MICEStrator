@@ -15,8 +15,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'eventId 파라미터가 필요합니다.' }, { status: 400 })
   }
 
-  // UUID 형식 간단 검증
-  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  // UUID 형식 검증 (v4)
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
   if (!UUID_RE.test(eventId)) {
     return NextResponse.json({ error: 'eventId는 UUID 형식이어야 합니다.' }, { status: 400 })
   }

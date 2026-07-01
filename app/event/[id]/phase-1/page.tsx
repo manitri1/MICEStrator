@@ -297,6 +297,7 @@ export default function Phase1Page() {
         editedPhase={1}
         affectedPhases={staledPhases}
         onDismiss={() => setStaledPhases([])}
+        eventId={eventId}
       />
       <PhaseChat
         phaseNumber={1}
