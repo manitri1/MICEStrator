@@ -53,7 +53,14 @@ export async function POST(req: NextRequest) {
       ? 'AI 출력이 스키마를 만족하지 않습니다.'
       : 'Phase 1 에이전트 실행 중 오류가 발생했습니다.'
 
-    console.error('[phase-01] error:', err)
-    return NextResponse.json({ error: message }, { status: 500 })
+    const errMsg = err instanceof Error ? err.message : String(err)
+    const errStack = err instanceof Error ? err.stack : 'no stack'
+    console.error('[phase-01] error name:', err instanceof Error ? err.name : typeof err)
+    console.error('[phase-01] error message:', errMsg)
+    console.error('[phase-01] error stack:', errStack)
+    if (err && typeof err === 'object' && 'cause' in err) {
+      console.error('[phase-01] error cause:', (err as { cause: unknown }).cause)
+    }
+    return NextResponse.json({ error: message, debug: errMsg }, { status: 500 })
   }
 }

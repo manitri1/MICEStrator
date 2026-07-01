@@ -43,15 +43,26 @@ export async function runPhase1(input: Phase01Input): Promise<Phase01Output> {
     `위 정보를 바탕으로 MICE 행사 기획 전략을 수립하고 event_master 데이터를 생성해주세요.`,
   ].join('\n')
 
+  let llmJsonSchema: Record<string, unknown>
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    llmJsonSchema = (Phase01LLMSchema as any).toJSONSchema()
+    console.log('[phase-01] toJSONSchema OK, type:', llmJsonSchema?.type)
+  } catch (schemaErr) {
+    console.error('[phase-01] toJSONSchema FAILED:', schemaErr instanceof Error ? schemaErr.stack : schemaErr)
+    throw schemaErr
+  }
+
+  console.log('[phase-01] calling generateObject...')
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { object } = await generateObject({
     model: openai('gpt-4o'),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    schema: jsonSchema((Phase01LLMSchema as any).toJSONSchema()),
+    schema: jsonSchema(llmJsonSchema),
     temperature: 0.7,
     system: PHASE01_SYSTEM_PROMPT,
     prompt: userPrompt,
   }) as { object: Omit<Phase01Output, 'preparationPeriod' | 'eventScale' | 'industry'> }
+  console.log('[phase-01] generateObject OK')
 
   // 패스스루 필드는 LLM 생성 없이 입력값을 그대로 병합 (REQ-SUMMARY-001)
   return {
